@@ -139,7 +139,30 @@ REPRO:
 So the item-4 poll-priority fix (coop -14 -> -1) helped WiFi+BT + advertise+cmd,
 but a real connection + GATT subscribe + the 100ms notify thread still starves an
 HCI command-complete past HCI_CMD_TIMEOUT.
-NEXT-LOOP DEBUG PLAN:
+PROGRESS THIS LOOP (3rd+ attempt on the command-timeout):
+- Removed two variables: CONFIG_BT_SHELL=n + CONFIG_SYSTEM_WORKQUEUE_STACK_SIZE=2048
+  (test/coex/soak.conf). Subscribe then SUCCEEDED + 1 notify delivered, but still
+  faulted -> not a shell conflict or sys_work_q overflow (fault esf +1744 within
+  2048 = no overflow).
+- Implemented the DRAIN fix (committed 314c6b8): the poll thread now drains all
+  pending BT/WiFi work per wake (bounded 32), not one packet. This MARKEDLY
+  helped: a live connected notify peripheral now SURVIVES (uptime advanced
+  42s/74s) where it used to fault on subscribe. No regression on the canonical
+  shell app (boot+WiFi+bt init+advertise + ping coex all clean). WiFi-only build
+  kept green (guarded cyw43_ll_bt_has_work behind CONFIG_BT).
+- REMAINING fault (still intermittent): the self-starting peripheral's
+  bt_enable() at boot (z_main_stack), and longer-lived connections, still hit the
+  command-timeout occasionally. KEY DIAGNOSTIC at the fault: the poll thread is
+  PENDING/idle (state 0x02) and the cyw43 bus mutex is FREE (owner 0xffffffff,
+  depth 0) -> nothing deadlocked; the command-complete was simply never surfaced
+  to the host (poll had no work to do). That points BELOW the driver, into the
+  cybt_shared_bus BT-mailbox / WL_HOST_WAKE signaling or the controller firmware:
+  either the command-complete never arrived, or cyw43_ll_bt_has_work() never
+  flagged it. Note `bt init` from the shell (same bt_enable) is reliable when the
+  system is idle; the fault correlates with bt_enable/connection happening while
+  the bus is busy (boot WiFi assoc, or active connection traffic).
+
+NEXT-LOOP DEBUG PLAN (was; partially done above):
   - Build with test/coex/debug_threads.conf; repro; at the fault capture ALL
     thread states (`kernel thread list`) to see who holds/starves the bus and
     where the poll/BT-RX-WQ/sys_work_q are.
@@ -286,6 +309,14 @@ coex) after ANY RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- DRAIN fix (314c6b8): poll thread drains all pending BT/WiFi work per wake
+  (bounded 32) instead of one packet -> live BLE connection survives where it
+  faulted before; canonical app + WiFi-only build green; soak.conf added
+  (BT_SHELL=n + bigger sys_work_q for the soak build). Command-timeout markedly
+  improved but NOT fully eliminated for a live connection under boot/load — deep
+  diagnostics (poll idle + lock free at fault) point into cybt_shared_bus /
+  controller signaling. SOAK still blocked on this; see "BLE-connection
+  command-timeout". 3rd+ attempt on this item -> escalating per loop protocol.
 - Soak BLE half built (BLE notify peripheral + bleak central, 43fda24) and the
   network unblocked (operator moved host+Pico to "funrun", host<->Pico reachable,
   bleak installed). BUT validating it exposed that the item-4 command-timeout is
