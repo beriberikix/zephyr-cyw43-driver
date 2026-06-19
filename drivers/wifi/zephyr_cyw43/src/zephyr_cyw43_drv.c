@@ -58,6 +58,10 @@ zephyr_cyw43_dev_t *zephyr_cyw43_dev = &zephyr_cyw43_0;
 #define EVENT_POLL_THREAD_PRIO (CONFIG_NUM_COOP_PRIORITIES - 1)
 K_KERNEL_STACK_MEMBER(zephyr_cyw43_event_poll_stack, EVENT_POLL_THREAD_STACK_SIZE);
 
+/* Max cyw43_poll() iterations to drain per poll-thread wake (bounds bus-lock
+ * hold time; the remainder is serviced on the next wake). */
+#define CYW43_POLL_DRAIN_MAX 32
+
 struct k_thread event_thread;
 static void zephyr_cyw43_event_poll_thread(void *p1)
 {
@@ -79,6 +83,29 @@ static void zephyr_cyw43_event_poll_thread(void *p1)
                 if (cyw43_poll) {
                         zephyr_cyw43_lock(zephyr_cyw43_dev);
                         cyw43_poll();
+                        /*
+                         * A single cyw43_poll() (cyw43_poll_func) services at
+                         * most ONE BT packet and one WiFi pass. During an active
+                         * BLE connection the controller streams connection/ACL
+                         * events, and an HCI command-complete can sit behind that
+                         * backlog; draining one-per-wake misses HCI_CMD_TIMEOUT
+                         * ("Controller unresponsive"). Drain the rest of the
+                         * pending work this wake, bounded so a continuous stream
+                         * cannot hold the bus lock indefinitely (the remainder is
+                         * picked up on the next wake).
+                         */
+                        for (int i = 0; i < CYW43_POLL_DRAIN_MAX; i++) {
+                                bool more = cyw43_ll_has_work(&cyw43_state.cyw43_ll);
+#if defined(CONFIG_BT)
+                                /* cyw43_ll_bt_has_work is only built with BT. */
+                                more = more ||
+                                       cyw43_ll_bt_has_work(&cyw43_state.cyw43_ll);
+#endif
+                                if (!more) {
+                                        break;
+                                }
+                                cyw43_poll();
+                        }
                         zephyr_cyw43_unlock(zephyr_cyw43_dev);
                 }
                 else {
