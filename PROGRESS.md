@@ -42,7 +42,7 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | VERIFIED | docs/artifacts/item4_coex_arbitration_20260619.log — root-caused poll-thread priority inversion; fixed (coop -14 -> -1); realistic coex (advertise+WiFi load+HCI cmds) 4 rounds clean. Full 2h soak = SOAK row. |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | VERIFIED | docs/artifacts/item5_initorder_20260619.log — BT-only, WiFi-then-BT, BT-then-WiFi all clean; BT survives WiFi disconnect cycles (shared power not dropped). |
 | 6 | Firmware blob pinned + provenance/license recorded | VERIFIED | REFERENCE.md §1 — wb43439A0_7_95_49_00_combined.h SHA-256 6b4b9a71…, cyw43-driver v1.0.4, RP (non-EULA) license, runtime versions logged. |
-| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | TODO | |
+| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | NOT PASSING (characterized) | test/coex/results/soak_characterization_20260619.md — live BLE connect+subscribe faults the controller FREQUENTLY (within seconds), with/without WiFi load. Gated by the cybt_shared_bus/controller command-timeout. Shell-driven coex is solid. |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | VERIFIED | REFERENCE.md §2 — HCI-over-gSPI framing, transport primitives, single-lock poll arbitration + poll-priority rule, init/power ordering, BD_ADDR derivation, controller caps. |
 
 ## Item 4 RESOLVED (poll-thread priority inversion) — analysis
@@ -309,6 +309,13 @@ coex) after ANY RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- SOAK characterized (operator chose "characterize"): built test/coex/soak.sh
+  orchestrator (SWD-reset cycles + Pico/host WiFi load + bleak central + gdb
+  fault-check). Result: a live BLE connect+subscribe faults the controller
+  FREQUENTLY (most attempts, within seconds), with or without WiFi load — the
+  command-timeout is the gating issue and is NOT rare. Shell-driven coex stays
+  solid. Soak cannot pass until the cybt_shared_bus/controller command-timeout
+  is fixed. Artifact: test/coex/results/soak_characterization_20260619.md.
 - DRAIN fix (314c6b8): poll thread drains all pending BT/WiFi work per wake
   (bounded 32) instead of one packet -> live BLE connection survives where it
   faulted before; canonical app + WiFi-only build green; soak.conf added
