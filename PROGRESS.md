@@ -42,7 +42,7 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | VERIFIED | docs/artifacts/item4_coex_arbitration_20260619.log — root-caused poll-thread priority inversion; fixed (coop -14 -> -1); realistic coex (advertise+WiFi load+HCI cmds) 4 rounds clean. Full 2h soak = SOAK row. |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | VERIFIED | docs/artifacts/item5_initorder_20260619.log — BT-only, WiFi-then-BT, BT-then-WiFi all clean; BT survives WiFi disconnect cycles (shared power not dropped). |
 | 6 | Firmware blob pinned + provenance/license recorded | VERIFIED | REFERENCE.md §1 — wb43439A0_7_95_49_00_combined.h SHA-256 6b4b9a71…, cyw43-driver v1.0.4, RP (non-EULA) license, runtime versions logged. |
-| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | NEARLY (residual cybt overflow now RARE after poll coop -10; heavy-load 3/3 clean; need long-run rate + operator scope) | test/coex/results/ — poll raised to coop -10 (5c17ff6, above BT RX WQ -8 + BT HCI TX -9). Moderate 6-cycle: 1/6 faults (was 2/6). Heavy-load (Pico ping ~40/s + host ping 5/s + BLE 9/s) 3/3 clean incl. 2x full-90s/~800 notif. Residual = same cybt_hci_read 4 KB bt2host-ring overflow (shared-bus latency, not buffer exhaustion). Option (b) inline-recv NOT viable (this Zephyr's bt_hci_recv always defers to a workq). Long-run rate + full 2h gate scope = operator call. |
+| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | BLOCKED — root cause is gSPI corruption BELOW our driver (vendored cybt HAL); persists with the bus lock HELD. ~2 faults / 4 real connections at moderate load. Needs operator decision on approach. | test/coex/results/txlock_mutex_held_at_fault_20260619.txt — DECISIVE: at the panic the cyw43 bus mutex owner=bt_tx_processor, lock_count=1, i.e. exclusive bus access was held yet cybt_get_bt_buf_index read a controller ring index >= 0x1000 (garbage) -> assert -> panic(reason 4) on bt_tx_processor. Corruption is at/below pico-sdk cybt_shared_bus (gSPI F1-overflow / controller-DMA contention on the BT backplane read, unhandled the way the WiFi path handles it), NOT a host-locking defect. poll coop -10 (5c17ff6) + BT-TX bus lock (8df7566) are both correct arbitration but neither removes this fault. See "SOAK ROOT CAUSE — gSPI corruption". |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | VERIFIED | REFERENCE.md §2 — HCI-over-gSPI framing, transport primitives, single-lock poll arbitration + poll-priority rule, init/power ordering, BD_ADDR derivation, controller caps. |
 
 ## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
@@ -125,6 +125,51 @@ REFINED MECHANISM: the overflow is cybt_hci_read detecting fw_b2h_buf_count <
 RATE WITH coop -10 (aggregate): moderate 5/6 clean (1 fault) + heavy 3/3 clean
   -> ~1 fault in ~9 cycles, down from ~1 in 3. A 12-cycle soak is running to
   pin the rate; full 2h x N gate scope = operator call.
+
+## SOAK ROOT CAUSE — gSPI shared-bus corruption (BELOW the driver) — NEEDS DECISION
+DECISIVE gdb evidence (artifact txlock_mutex_held_at_fault_20260619.txt +
+txlock_rootcause_backtrace_20260619.log + post_txlock_faultcap_20260619.log):
+The soak fault is a kernel panic (reason 4) on the bt_tx_processor thread:
+  tx_processor -> send_buf -> zephyr_cyw43_bt_hci_send ->
+  cyw43_bluetooth_hci_write -> cybt_hci_write_buf -> cybt_get_bt_buf_index ->
+  assert(ring index < BTSDIO_FWBUF_SIZE) FAILS (index read back >= 0x1000).
+AT THE FAULT the cyw43 bus mutex owner = bt_tx_processor_workq, lock_count = 1:
+the BT TX path HELD the bus lock, so host-side exclusive bus access was in
+effect and STILL the controller's shared-memory ring index read back corrupt.
+=> The corruption is NOT a host-side locking/arbitration defect. It is at or
+   below the vendored pico-sdk cybt_shared_bus transport
+   (modules/hal/rpi_pico/.../cybt_shared_bus{,_driver}.c): the BT backplane
+   read does not handle gSPI F1-overflow / controller-DMA contention the way
+   the WiFi path (cyw43_ll) does, so under concurrent WiFi bus traffic the
+   read returns garbage and cybt ASSERTS instead of retrying. (Upstream even
+   ships a CYBT_CORRUPTION_TEST debug path acknowledging this corruption.)
+Fixes applied this loop are CORRECT arbitration but do NOT remove this fault:
+  - poll coop -10 (5c17ff6): poll above BT RX WQ/TX so it drains promptly.
+  - BT-TX bus lock (8df7566): TX write now serialized under the bus mutex
+    (it was the one unlocked bus path). VERIFIED in the binary (objdump shows
+    cyw43_thread_enter/exit around the write) and the mutex is held at fault.
+Fault rate with both: ~2 faults / 4 real BLE connections at moderate load
+(verify soak soak_20260619_195727.log; faults cycle 2 @6.2s and cycle 4 @
+teardown). No-load/light still clean.
+THIS IS THE 5th ATTEMPT on the soak fault -> ESCALATE per loop protocol.
+CANDIDATE FIXES (need operator approval on APPROACH/scope):
+  (A) Patch the vendored pico-sdk cybt HAL: in cybt_get_bt_buf_index, on a
+      corrupt (>= BTSDIO_FWBUF_SIZE) index, RE-READ instead of assert (the
+      corruption is transient), or handle F1-overflow on the BT read path.
+      Likely the real fix, but edits modules/hal/rpi_pico (a west-managed
+      upstream module) -> needs a durable patch/fork mechanism, not a raw edit.
+  (B) Driver-level redesign: move the BT HCI TX off the separate
+      bt_tx_processor thread into the poll-thread context (queue TX bufs; the
+      poll thread does cyw43_bluetooth_hci_write in-sequence with the RX
+      has_work handshake), matching pico-sdk's single-run-loop model. Larger
+      change, in our driver scope, uncertain it removes the corruption.
+  (C) Accept + document as a known shared-3-pin-bus-under-load limitation and
+      certify the soak against a bounded WiFi-load threshold (spec allows
+      "within threshold of baseline"); no-load/light is clean.
+Also: the HOST BLE adapter (BlueZ hci0) wedges after ~6 connect/disconnect
+cycles (cycles 7-12 of soak_20260619_191658.log = notif=0/conn=0). soak.sh now
+needs a per-cycle `bluetoothctl power off/on` (added to the faultcap chain) or
+a different host to run a long gate.
 
 ## Item 4 RESOLVED (poll-thread priority inversion) — analysis
 ROOT CAUSE: the cyw43 shared-bus poll thread (sole gSPI reader; feeds the BT
@@ -342,24 +387,32 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
 UART is wired and working (done). Console driven via test/coex/console.py.
 
 ## NEXT UP (resume pointer)
-M0.0, M0.1, items 1-6, REF VERIFIED. SOAK: poll-priority fix (a) DONE (5c17ff6,
-coop -2 -> -10). Residual cybt overflow is now RARE (~1 fault in ~9 cycles, was
-~1 in 3): moderate 5/6 clean + heavy-load 3/3 clean. Option (b) ruled out
-(no inline recv in this Zephyr). See "THE SCHEDULING DILEMMA — RESOLUTION".
-  -> IN FLIGHT: a 12-cycle/90s soak is running (artifact = newest
-     test/coex/results/soak_*.log; /tmp/soak12.out) to pin the residual fault
-     rate with coop -10. Check its SUMMARY on resume.
-  -> THEN: driver-side scheduling levers are EXHAUSTED (priority applied; inline
-     recv unavailable; bt2host ring is fixed 4 KB in controller FW). The
-     remaining residual is an inherent shared-3-pin-bus latency ceiling. DECISION
-     IS THE OPERATOR'S (it's in OPEN DECISIONS): (i) the WiFi-load threshold to
-     certify the soak against ("within threshold of baseline" per spec), (ii)
-     full-gate scope/duration (2h x N), (iii) whether the documented rare
-     load-sensitive cybt-overflow residual is acceptable as a known shared-bus
-     limitation for the reference driver. Ask these, then run the agreed gate.
-  -> Orthogonal re-verifies still worth doing for the priority change (low risk,
-     soak already exercises RX/TX/poll hardest): cold-boot BD_ADDR (item 1) and
-     rx_stress (item 3) on the canonical app.
+M0.0, M0.1, items 1-6, REF VERIFIED. SOAK is BLOCKED (escalated) — root cause
+now PRECISELY pinned (see "SOAK ROOT CAUSE — gSPI shared-bus corruption"):
+the fault is a corrupt controller ring-index read in the vendored pico-sdk
+cybt_shared_bus HAL that persists EVEN WITH the cyw43 bus mutex held by the BT
+TX thread (gdb-confirmed). Both arbitration fixes this loop (poll coop -10
+5c17ff6, BT-TX bus lock 8df7566) are correct but do NOT remove it.
+  -> AWAITING OPERATOR DECISION on approach: (A) patch the vendored cybt HAL to
+     retry-on-corrupt-index / handle F1-overflow on the BT read (likely real
+     fix, edits modules/hal/rpi_pico -> needs durable patch mechanism); (B)
+     driver redesign to do BT TX from the poll-thread context (pico-sdk
+     single-run-loop model); (C) accept + document as a known shared-bus
+     limitation and certify against a bounded load threshold. Recommendation:
+     (A) first (most likely to actually fix it) with (C) as the fallback if the
+     corruption is truly unavoidable at the bus level.
+  -> Harness fix needed for a long gate: host BlueZ adapter wedges after ~6
+     cycles; add per-cycle `bluetoothctl power off/on` to soak.sh (already in
+     the faultcap chain) or use a different host.
+  -> Orthogonal re-verifies still pending for the two arbitration commits (low
+     risk; soak already exercises RX/TX/poll hardest): cold-boot BD_ADDR
+     (item 1) + rx_stress (item 3) on the canonical app; WiFi-only + full
+     builds already green this loop.
+Board currently holds build_soak (BLE peripheral). Soak build:
+  west build -b rpi_pico2/rp2350a/m33/w -d build_soak app -- \
+    -DEXTRA_CONF_FILE="$PWD/app/local.conf;$PWD/test/coex/soak.conf" \
+    -DCONFIG_APP_BLE_PERIPHERAL=y
+Drive: test/coex/soak.sh [CYCLES] [MAX_CONN_S]; fault backtrace via /tmp/faultcap.sh.
 Tools: build_soak (-DCONFIG_APP_BLE_PERIPHERAL=y + soak.conf), test/coex/soak.sh
 (gdb fault-check; net ping blocks the shell so use gdb for liveness),
 ble_central.py (teardown disconnect no longer false-flags). Board: canonical app.
@@ -416,6 +469,23 @@ coex) after ANY RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- SOAK root-caused to gSPI corruption BELOW the driver + ESCALATED (5th
+  attempt). gdb esf-unwind of the soak fault: panic(reason 4) on bt_tx_processor
+  in cybt_get_bt_buf_index (corrupt controller ring index >= 0x1000) via the BT
+  HCI TX path. Added the missing bus lock on that TX path (8df7566,
+  cyw43_thread_enter/exit around cyw43_bluetooth_hci_write) -- VERIFIED in the
+  binary -- but a re-run faulted IDENTICALLY with the mutex HELD by
+  bt_tx_processor (lock_count=1). So host-side exclusive bus access does not
+  prevent the corruption: it is at/below the vendored pico-sdk cybt_shared_bus
+  transport (gSPI F1-overflow / controller-DMA contention on the BT backplane
+  read). Both arbitration fixes this loop (poll coop -10, TX bus lock) are
+  correct but neither removes the fault (~2/4 real connections at moderate
+  load). Escalated with 3 candidate approaches (patch cybt HAL / move TX to poll
+  context / accept+document+bounded-load). Also found the host BlueZ adapter
+  wedges after ~6 cycles (soak harness needs a per-cycle adapter reset).
+  Artifacts: test/coex/results/txlock_mutex_held_at_fault_20260619.txt,
+  txlock_rootcause_backtrace_20260619.log, post_txlock_faultcap_20260619.log,
+  soak_20260619_195727.log.
 - Soak residual mitigated + characterized (commit 5c17ff6). Raised the gSPI poll
   thread from coop -2 to coop -10 (one band above BT RX WQ -8 and BT HCI TX -9,
   via MIN(BT_RX_PRIO,BT_HCI_TX_PRIO)-1) so the sole bus reader drains the

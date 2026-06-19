@@ -1,0 +1,17 @@
+=== 12-cycle SUMMARY ===
+>> cycle 1: notif=21 conn=2.2s end=FAULT disc=0
+>> cycle 2: notif=264 conn=28.2s end=FAULT disc=0
+>> cycle 3: notif=848 conn=90.1s end=ALIVE disc=0
+>> cycle 4: notif=33 conn=3.4s end=FAULT disc=0
+>> cycle 5: notif=484 conn=90.0s end=ALIVE disc=0
+>> cycle 6: notif=849 conn=90.1s end=ALIVE disc=0
+>> cycle 7: notif=0 conn=0s end=ALIVE disc=0
+>> cycle 8: notif=0 conn=0s end=ALIVE disc=0
+>> cycle 9: notif=0 conn=0s end=ALIVE disc=0
+>> cycle 10: notif=0 conn=0s end=ALIVE disc=0
+>> cycle 11: notif=0 conn=0s end=ALIVE disc=0
+>> cycle 12: notif=0 conn=0s end=ALIVE disc=0
+cycles: 12   faults: 3   clean-disconnects: 0
+total connected time: 304s   total notifications: 2499
+MTBF (connected): 101.3 s/fault over 304.0 s
+=== faultcap done ===

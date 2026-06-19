@@ -1,0 +1,24 @@
+Decisive diagnostic (post TX-lock fix 8df7566), gdb on the halted board:
+
+faulting stacked pc = abort+24   (reason=4 kernel panic)
+esf on bt_tx_processor_stack+728
+chain (from root-cause capture): tx_processor -> send_buf ->
+  zephyr_cyw43_bt_hci_send -> cyw43_bluetooth_hci_write -> cybt_hci_write_buf
+  -> cybt_get_bt_buf_index -> assert(index < BTSDIO_FWBUF_SIZE) FAILS
+
+cyw43 bus mutex (zephyr_cyw43_0.mutex) AT THE FAULT:
+  owner      = 0x20002e98 <bt_tx_processor_workq>
+  lock_count = 1
+  owner_orig_prio = -1
+
+=> The BT TX path HOLDS the bus lock when the corrupt index is read.
+   Exclusive host-side bus access does NOT prevent the corruption.
+   The controller's shared-memory ring index reads back >= 0x1000 (garbage)
+   under concurrent WiFi bus load even with the gSPI bus serialized.
+   Conclusion: corruption is at/below the vendored pico-sdk cybt_shared_bus
+   transport (gSPI F1-overflow / controller-DMA contention not handled on the
+   BT backplane read path the way the WiFi path handles it), NOT a host-side
+   locking defect. cybt asserts on the corrupt index instead of retrying.
+
+Verify-soak fault rate with the TX lock (moderate load): 2 faults / 4 real
+connections (cycles 2,3,4,5); 2 host-side connect-failures (cycles 1,6).

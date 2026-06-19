@@ -1,0 +1,61 @@
+===== faultcap cycle 1 =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+net ping -c 1000000 -i 25 8.8.8.8
+PING 8.8.8.8
+[41D[J[00:00:08.814,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.814,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.814,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.814,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.814,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+[1;32muart:~$ [mnet[41D[J[1;32muart:~$ [mnet28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=24 ttl=115 time=30 ms
+scanning for 'test-picow-bluetooth' / 88:A2:9E:D1:6D:A0 ...
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+connected; subscribing ...
+disconnected (teardown)
+=== BLE CENTRAL SUMMARY ===
+notifications: 763
+duration: 90.1s   rate: 8.5/s
+max inter-notify gap: 0.361s
+stalls over 3.0s: 0
+last counter value: 762
+unexpected disconnect: False
+RESULT: PASS
+----- gdb bt cycle 1 -----
+arch_system_halt (reason=reason@entry=4) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/kernel/fatal.c:29
+29		for (;;) {
+available
+#0  arch_system_halt (reason=reason@entry=4) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/kernel/fatal.c:29
+#1  0x1002b2c6 in k_sys_fatal_error_handler (reason=reason@entry=4, esf=esf@entry=0x20009e60 <bt_tx_processor_stack+728>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/kernel/fatal.c:43
+#2  0x1002b390 in z_fatal_error (reason=reason@entry=4, esf=esf@entry=0x20009e60 <bt_tx_processor_stack+728>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/kernel/fatal.c:118
+#3  0x10009aca in z_arm_fatal_error (reason=4, esf=0x20009e60 <bt_tx_processor_stack+728>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/arch/arm/core/fatal.c:93
+#4  0x1000a0f8 in z_arm_svc () at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/arch/arm/core/cortex_m/svc.S:158
+Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+pc             0x1003ab30          0x1003ab30 <arch_system_halt+14>
+[Inferior 1 (Remote target) detached]
+>>> FAULT captured cycle 1
+DONE
