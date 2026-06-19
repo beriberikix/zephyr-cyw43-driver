@@ -41,7 +41,7 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | VERIFIED | docs/artifacts/item3_rx_stress_20260619.log — 120s forced-exhaustion (discardable=1) flood, 542 reports, device responsive throughout (uptime 17->150s), 0 faults. RESULT: PASS. |
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | VERIFIED | docs/artifacts/item4_coex_arbitration_20260619.log — root-caused poll-thread priority inversion; fixed (coop -14 -> -1); realistic coex (advertise+WiFi load+HCI cmds) 4 rounds clean. Full 2h soak = SOAK row. |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | VERIFIED | docs/artifacts/item5_initorder_20260619.log — BT-only, WiFi-then-BT, BT-then-WiFi all clean; BT survives WiFi disconnect cycles (shared power not dropped). |
-| 6 | Firmware blob pinned + provenance/license recorded | TODO | |
+| 6 | Firmware blob pinned + provenance/license recorded | VERIFIED | REFERENCE.md §1 — wb43439A0_7_95_49_00_combined.h SHA-256 6b4b9a71…, cyw43-driver v1.0.4, RP (non-EULA) license, runtime versions logged. |
 | SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | TODO | |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | TODO | |
 
@@ -173,14 +173,21 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
 UART is wired and working (done). Console driven via test/coex/console.py.
 
 ## NEXT UP (resume pointer)
-M0.0, M0.1, items 1-4 VERIFIED. Remaining: item 5, item 6, SOAK, REF.
-  -> NEXT: item 5 — shared WL_REG_ON/BT_REG_ON power: verify BT-only, WiFi-then-BT,
-     BT-then-WiFi init orders all come up clean (logged). See item 5 row.
-  -> Then item 6 (pin firmware blob + provenance in REFERENCE.md), REF (REFERENCE.md
-     transport/arbitration contract), and SOAK (2h + 5 cold boots, real WiFi load).
-  -> SOAK note: WiFi load generation is unsolved — host can't reach the Pico's
-     192.168.x net and gateway ICMP times out. Need zperf (Zephyr->external server)
-     or put the host on the AP LAN. Resolve before the soak gate.
+M0.0, M0.1, items 1-6 VERIFIED. Remaining: REF (full transport contract in
+REFERENCE.md §2) and SOAK (2h + 5 cold boots).
+  -> NEXT: REF — fill REFERENCE.md §2 transport/arbitration contract (HCI-over-gSPI
+     4-byte header + H4 indicators; read/write/has_work/ensure_up primitives; the
+     single recursive-mutex poll-loop arbitration model incl. the poll-thread
+     priority fix from item 4; init/power ordering from item 5; BD_ADDR = WiFi
+     MAC+1 from item 1). Most facts already in PROGRESS items 1-5.
+  -> Then SOAK (the rock-solid gate).
+  -> SOAK BLOCKER (unresolved): WiFi load generation — host can't reach the Pico's
+     192.168.x net and gateway ICMP times out. Need zperf (Zephyr->external iperf3
+     server) or the host on the AP LAN, plus a host bleak central (bleak not yet
+     installed). Also need a peripheral GATT notify characteristic in the app
+     (currently only `bt advertise`/shell; the soak needs a connectable notify
+     peripheral). Resolve these before the soak gate; likely an operator decision
+     on test topology (ask).
 Board: rebuild/flash the canonical app for resume:
   source ../.venv/bin/activate
   west build -b rpi_pico2/rp2350a/m33/w -d build_pico2 app
@@ -204,6 +211,9 @@ coex) after ANY RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- Item 6 (firmware blob pinning) done. Created REFERENCE.md §1 with the combined
+  wb43439A0_7_95_49_00 blob SHA-256, provenance (cyw43-driver v1.0.4), the RP
+  (non-EULA) license, and runtime-reported WiFi/BT firmware versions.
 - Item 5 (shared WL_REG_ON power / init order) VERIFIED. Added
   CONFIG_APP_WIFI_AUTOCONNECT (default y) to make a BT-only / BT-first boot
   buildable. Hardware-tested all three init orders (BT-only, WiFi-then-BT,
