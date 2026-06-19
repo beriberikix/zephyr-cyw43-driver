@@ -134,19 +134,32 @@ There is ONE gSPI bus shared by WiFi and BT, serialized by ONE recursive mutex
   ISR, or a 5 s timeout), takes the lock, and runs `cyw43_poll()` →
   `cyw43_poll_func()`, which services **BT first then WiFi** under the lock:
   `if (bt_has_work) cyw43_bluetooth_hci_process(); if (ll_has_work) ll_process_packets();`
-- Host TX paths (BT `cyw43_bluetooth_hci_write`, WiFi TX) take the SAME lock via
-  `CYW43_THREAD_ENTER/EXIT`, so no bus access ever races.
-- **Priority rule (item 4, critical):** the poll thread MUST be cooperative (the
-  cyw43_ll relies on no-preemption for implicit mutual exclusion — making it
-  preemptible corrupts state and asserts) but at the **LOWEST** cooperative
-  priority (`K_PRIO_COOP(CONFIG_NUM_COOP_PRIORITIES-1)` == -1). At the highest
-  coop priority it starved the Bluetooth host RX workqueue (coop -8): HCI events
-  were read off the bus but never delivered, and `bt_hci_cmd_send_sync` timed out
-  ("Controller unresponsive") under concurrent WiFi+BT load. At the lowest coop
-  priority the poll hook's `k_yield()` releases the CPU to the RX/TX consumers.
+- Host TX paths must take the SAME lock. WiFi TX uses `CYW43_THREAD_ENTER/EXIT`.
+  The BT HCI TX path (`zephyr_cyw43_bt_hci_send` → `cyw43_bluetooth_hci_write`)
+  is the ONE bus path the upstream georgerobotics/pico-sdk code does NOT wrap, so
+  this driver wraps it explicitly in `cyw43_thread_enter()/exit()` (commit
+  8df7566). Without it, a BT TX from the `bt_tx_processor` thread issues SPI
+  transactions concurrently with the poll thread (the bus code yields/sleeps
+  mid-transfer, so even cooperative threads interleave). A WHD transport MUST
+  hold the bus lock around every bus access on every path, TX included.
+- **Priority rule (item 4):** the poll thread MUST be cooperative (the cyw43_ll
+  relies on no-preemption for implicit mutual exclusion — making it preemptible
+  corrupts state and asserts). It runs **one cooperative band above both BT
+  threads** — `K_PRIO_COOP(MIN(CONFIG_BT_RX_PRIO, CONFIG_BT_HCI_TX_PRIO) - 1)`
+  == coop -10, above the BT RX workqueue (-8) and BT HCI TX (-9) — so the sole
+  bus reader drains the controller's bt2host ring promptly under load. The
+  per-wake drain (`cyw43_bluetooth_hci_process` loops the full pending ring, then
+  the poll BLOCKS on `event_sem`) is what releases the CPU to the RX WQ for
+  delivery, so command-completes still arrive within `HCI_CMD_TIMEOUT`. (History:
+  the original highest-coop value -14 starved the RX WQ — events read but never
+  delivered → timeout; the intermediate lowest-coop -2 sat below the RX WQ so the
+  ring overflowed under load. Both fixed by -10 + the per-wake drain.)
 - A WHD transport sharing the bus must keep this single-lock, single-reader,
-  BT-first, lowest-coop-priority arrangement (or an equivalent that guarantees
-  HCI command-completes are delivered within `HCI_CMD_TIMEOUT` under WiFi load).
+  BT-first arrangement with the bus reader prioritized above the BT consumers and
+  every TX path holding the lock.
+
+See **§2.7** for a shared-bus coexistence limitation that survives this
+arbitration (a gSPI-level corruption below the transport).
 
 ### 2.4 Init / power ordering (item 5)
 
@@ -177,4 +190,54 @@ hook reads the controller BD_ADDR (HCI `Read_BD_ADDR`) and verifies it equals
 - Does **not** support LE ISO (`iso listen` → -ENOTSUP). No CIS/BIS audio.
 - These are controller-firmware limits, not driver limits; relevant to what BLE
   features the coexistence scope can offer.
+
+### 2.7 Shared-bus coexistence limitation — gSPI corruption under heavy load
+
+**Symptom.** Under *sustained heavy concurrent WiFi throughput* simultaneous with
+an active BLE connection, the Pico can take a kernel panic (K_ERR_KERNEL_PANIC)
+on the `bt_tx_processor` thread:
+
+```
+tx_processor -> send_buf -> zephyr_cyw43_bt_hci_send -> cyw43_bluetooth_hci_write
+  -> cybt_hci_write_buf -> cybt_get_bt_buf_index
+  -> assert(ring_index < BTSDIO_FWBUF_SIZE)   # index read back >= 0x1000 (garbage)
+```
+
+**Root cause (gdb-proven, not a host-side bug).** The BT TX path reads the
+controller's shared-memory ring indices over the gSPI backplane. At the panic the
+cyw43 bus mutex is **held** by `bt_tx_processor` (`lock_count = 1`), i.e. host-side
+mutual exclusion was in force and the index *still* read back corrupt. The
+corruption is therefore at/below the vendored **pico-sdk `cybt_shared_bus`**
+transport: under concurrent WiFi bus traffic the BT backplane read is hit by the
+same gSPI F1-overflow / controller-DMA contention the WiFi path (`cyw43_ll`)
+explicitly recovers from, but the BT read path does not — and `cybt` `assert()`s
+on the resulting out-of-range index instead of retrying. (Upstream even ships a
+`CYBT_CORRUPTION_TEST` debug path acknowledging this corruption exists.)
+
+**What this driver already does right (necessary, not sufficient).**
+- Poll thread one cooperative band above both BT threads (§2.3) so the bus reader
+  drains the ring promptly.
+- The BT HCI TX write is wrapped in the bus lock (§2.3, commit 8df7566) — the one
+  path upstream leaves unlocked.
+These uphold the single-bus arbitration contract but cannot prevent corruption
+that occurs *below* host serialization, inside the gSPI transport.
+
+**Certified operating envelope (hardware-verified, zero faults).** STA associated
++ BLE central connected + a notify characteristic streaming (~9.6 notif/s) +
+**bounded bidirectional WiFi load** (device→internet ping ~1/s, host→device ping
+~0.5/s): **8 SWD-reset cold boots, 0 faults, 0 unexpected BLE disconnects, 6070
+notifications over 630 s connected** (`test/coex/results/soak_bounded_8boot_20260619.log`),
+plus a sustained single-connection run
+(`test/coex/results/soak_bounded_long_20260619.log`). No-load and light-load
+operation is clean; the fault appears only under sustained heavy concurrent
+throughput and is probabilistic (not every heavy connection faults).
+
+**Recommendation for the WHD port / a production fix.** Make the BT backplane read
+robust at the transport: detect the out-of-range index and **re-read** (the
+corruption is transient) rather than asserting, and/or apply the WiFi path's
+F1-overflow recovery to BT reads. That fix belongs in the shared-bus transport
+(here: pico-sdk `cybt_shared_bus_driver.c::cybt_get_bt_buf_index`), so it must be
+carried as a durable patch/fork of that upstream module, not a raw edit that
+`west update` would revert. Until then, certify against the bounded envelope above
+and bound concurrent WiFi throughput when a BLE link must stay up.
 
