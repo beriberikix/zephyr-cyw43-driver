@@ -14,6 +14,21 @@ config APP_WIFI_AUTOCONNECT
 	  the radio up without a WiFi association (e.g. a BT-only product, or to
 	  exercise the BT-then-WiFi / BT-only init orders).
 
+config APP_BLE_PERIPHERAL
+	bool "Self-starting BLE notify peripheral (for the coex soak)"
+	default n
+	depends on BT_PERIPHERAL
+	help
+	  Start a connectable BLE peripheral at boot with one notify
+	  characteristic that streams a counter once subscribed. Used by the
+	  WiFi+BLE coexistence soak (test/coex). Off by default so the reference
+	  app stays lean (BT via shell).
+
+config APP_BLE_NOTIFY_INTERVAL_MS
+	int "BLE notify interval (ms)"
+	default 100
+	depends on APP_BLE_PERIPHERAL
+
 menu "Zephyr"
 source "Kconfig.zephyr"
 endmenu

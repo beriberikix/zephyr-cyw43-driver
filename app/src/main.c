@@ -11,6 +11,10 @@
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_config.h>
 
+#if defined(CONFIG_APP_BLE_PERIPHERAL)
+void app_ble_peripheral_start(void);
+#endif
+
 void wifi_connect(char *ssid, char * passwd) {
     int ret;
     
@@ -55,5 +59,9 @@ int main(void)
     printf("\n");
   }
   (void)net_config_init_app(NULL, "Initializing network");
+
+#if defined(CONFIG_APP_BLE_PERIPHERAL)
+  app_ble_peripheral_start();
+#endif
   return 0;
 }
