@@ -30,6 +30,10 @@ LOG_MODULE_REGISTER(bt_driver);
 
 #define MAX_BT_MSG_SIZE 2048
 
+/* Max packets to drain from the bt2host ring per process() call (bounds bus-lock
+ * hold time; any remainder is taken on the next poll). */
+#define CYW43_BT_DRAIN_MAX 32
+
 // cyw43_bluetooth_hci_write and cyw43_bluetooth_hci_read require a custom 4-byte packet header in front of the actual HCI packet
 // the HCI packet type is stored in the fourth byte of the packet header
 #define CYW43_PACKET_HEADER_SIZE 4
@@ -72,7 +76,7 @@ static int zephyr_cyw43_bt_hci_close(const struct device *dev)
 	return 0;
 }
 
-void cyw43_bluetooth_hci_process(void)
+static void cyw43_bt_process_one(void)
 {
 	struct net_buf *buf = NULL;
 	bool discardable = false;
@@ -207,6 +211,54 @@ void cyw43_bluetooth_hci_process(void)
 	bt_hci_recv(dev, buf);
 
 	LOG_DBG("Leaving cyw43_bluetooth_hci_process()");
+}
+
+/*
+ * Is there unread BT data in the controller's bt2host buffer?
+ *
+ * cyw43_ll_bt_has_work() only tests the I_HMB_FC_CHANGE interrupt flag in
+ * SDIO_INT_STATUS. The WiFi SDPCM path (cyw43_ll_process_packets) reads the same
+ * register and clears the whole I_HMB_SW_MASK (0xf0), which INCLUDES
+ * I_HMB_FC_CHANGE (bit 5). So under concurrent WiFi+BT the WiFi side can clear
+ * the BT flow-control flag before BT reads it, and an HCI command-complete then
+ * sits in the bt2host ring undetected -> bt_hci_cmd_send_sync() "Controller
+ * unresponsive". This checks the actual ring indices (the source of truth),
+ * independent of that flag, so the poll loop can drain BT regardless.
+ */
+bool cyw43_bluetooth_has_pending(void)
+{
+	cybt_fw_membuf_index_t idx;
+
+	if (!cyw43_state.bt_loaded) {
+		return false;
+	}
+	if (cybt_get_bt_buf_index(&idx) != CYBT_SUCCESS) {
+		return false;
+	}
+	return idx.bt2host_in_val != idx.bt2host_out_val;
+}
+
+/*
+ * Drain the controller's bt2host ring fully (called from the cyw43 poll loop
+ * when cyw43_ll_bt_has_work() reports BT data).
+ *
+ * I_HMB_FC_CHANGE has edge semantics: the controller asserts it when BT data
+ * becomes available, and cyw43_ll_bt_has_work() clears it after we read. If the
+ * controller batched several HCI packets under one assertion (e.g. a connection
+ * event plus the command-complete the host is blocked on in
+ * bt_hci_cmd_send_sync), reading only one leaves the rest stranded until the
+ * next assertion -> "Controller unresponsive" command timeout. So read every
+ * packet currently queued, staying on the normal cybt_hci_read() path so its
+ * internal book-keeping stays consistent. Bounded so a controller streaming
+ * without pause cannot hold the bus lock indefinitely.
+ */
+void cyw43_bluetooth_hci_process(void)
+{
+	int i = 0;
+
+	do {
+		cyw43_bt_process_one();
+	} while (cyw43_bluetooth_has_pending() && ++i < CYW43_BT_DRAIN_MAX);
 }
 
 static int zephyr_cyw43_bt_hci_send(const struct device *dev, struct net_buf *buf)
