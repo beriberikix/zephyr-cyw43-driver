@@ -1,0 +1,9 @@
+# Zephyr/west build output
+/build/
+/build_*/
+
+# Local, secret app config (WiFi SSID/PSK) — never commit
+/app/local.conf
+
+# Tooling state
+/.claude/
