@@ -90,18 +90,19 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
   (B) RTT over the existing SWD cable (no wiring): add `segger` to west.yml allowlist,
       west update, enable CONFIG_USE_SEGGER_RTT + SHELL_BACKEND_RTT + console on RTT,
       reflash, drive via `openocd ... -c "rtt setup/start"` + TCP socket. More setup.
-DECISION (operator, this run): go with (A) UART wiring.
-Operator action required — wire the Debug Probe "U" connector to Pico 2 W UART0:
-  probe TX  -> Pico GP1  (UART0 RX, physical pin 2)
-  probe RX  -> Pico GP0  (UART0 TX, physical pin 1)
-  probe GND <-> Pico GND (e.g. physical pin 3)
-RESUME after wiring: run `/loop`. First check is the console round-trip:
-  source ../.venv/bin/activate
-  python test/coex/console.py send "kernel version"   # expect a Zephyr version reply
-If it replies -> M0.0 console VERIFIED; proceed to M0.1 functional test
-  (`wifi connect`, `bt init`, `bt advertise on`) then backlog item 1.
-If still silent after wiring -> recheck TX/RX orientation (swap GP0/GP1) before falling back to RTT path (B).
-The app is already flashed (build_pico2/zephyr/zephyr.elf) and boots healthy; no reflash needed to test the console.
+UART is wired and working (done). Console driven via test/coex/console.py.
+
+## NEXT UP (resume pointer)
+M0.0, M0.1, item 1, item 2 are VERIFIED. Next highest-priority unverified item:
+  -> item 3: RX robustness (check cyw43_bluetooth_hci_read return; NULL-buf drop
+     policy on bt_buf_get_evt/get_rx exhaustion; length bounds checks).
+Then items 4 (threading/arbitration), 5 (power/init order), 6 (blob pin) + REF + SOAK.
+Board currently holds the canonical reference app (build_pico2/zephyr/zephyr.elf,
+no ISO). Resume needs only: `source ../.venv/bin/activate`, then build/flash/console
+via the recipes above. Rebuild the reference app with:
+  west build -b rpi_pico2/rp2350a/m33/w -d build_pico2 app
+Re-run the cold-boot harness after RX/poll changes; re-run a coex smoke after any
+RX/TX/poll/arbitration change.
 
 ## Artifacts (this run)
 - Build (WIFI+BT, rpi_pico2): build_pico2/zephyr/zephyr.elf (+ .uf2), build succeeds clean.
