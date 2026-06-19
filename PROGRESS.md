@@ -386,7 +386,18 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
       reflash, drive via `openocd ... -c "rtt setup/start"` + TCP socket. More setup.
 UART is wired and working (done). Console driven via test/coex/console.py.
 
-## NEXT UP (resume pointer)
+## NEXT UP (resume pointer) — near DONE
+Code is at coop -2 (a17aecd; poll -10 reverted) + BT-TX bus lock (8df7566).
+All driver-fixable items done. The ONE residual everywhere (soak + heavy BT
+flood) is the §2.7 below-driver cybt gSPI corruption — operator accepted +
+documented, transport-level fix recommended. Remaining before final summary:
+  -> IN FLIGHT: bounded soak at coop -2 (newest test/coex/results/soak_*.log)
+     to make the certification artifact match the SHIPPED code. Check SUMMARY.
+  -> Then: produce the DONE summary (honest: all driver code fixes VERIFIED;
+     SOAK accepted-with-documented-residual; item 3 host-handling VERIFIED,
+     heavy-flood fault = §2.7 below-driver limit). Nothing else outstanding.
+
+## (superseded) earlier resume pointer
 M0.0, M0.1, items 1-6, REF VERIFIED. SOAK is BLOCKED (escalated) — root cause
 now PRECISELY pinned (see "SOAK ROOT CAUSE — gSPI shared-bus corruption"):
 the fault is a corrupt controller ring-index read in the vendored pico-sdk
