@@ -76,8 +76,105 @@ runtime-reported versions.
 
 ## 2. Transport / arbitration contract (for the WHD port)
 
-> TODO (backlog item REF): document the HCI-over-gSPI framing (4-byte header,
-> H4 indicators), the read/write/has_work/ensure_up primitives, the single-lock
-> poll-loop arbitration model, init/power ordering, and BD_ADDR derivation. The
-> implementation facts are captured in PROGRESS.md (items 1–5) and will be
-> consolidated here.
+A WHD/AIROC shared-bus BT transport must mirror the contracts below. The BT HCI
+driver (`zephyr_cyw43_bt_hci_drv.c`) depends ONLY on the thin transport
+primitives in §2.2 plus Zephyr's `bt_hci` device API — never on WiFi-driver
+internals. Re-implementing those primitives for WHD is the whole port.
+
+### 2.1 HCI-over-gSPI framing
+
+The controller exchanges H:4-style HCI packets over the shared gSPI bus with a
+**4-byte transport header** prepended:
+
+```
+byte 0..2 : cyw43 shared-bus header (managed by cybt_shared_bus)
+byte 3    : H4 packet-type indicator (BT_HCI_H4_CMD/ACL/SCO/EVT/ISO)
+byte 4..  : the HCI packet (HCI header + payload), no extra H4 byte
+```
+
+- `cyw43_bluetooth_hci_write(buf, len)` and `cyw43_bluetooth_hci_read(buf, max,
+  *len)` both take/return a buffer that **includes** this 4-byte header; `len`
+  counts it. The last header byte (index 3) is the H4 type.
+- TX: the Zephyr host hands the driver a `net_buf` whose `data[0]` is already the
+  H4 indicator (the modern device-based `bt_hci` model). The driver copies the
+  buffer verbatim starting at header index 3, so the indicator lands in byte 3.
+  It validates the type is CMD/ACL/ISO and bounds the length against the TX
+  buffer (`zephyr_cyw43_bt_hci_send`).
+- RX: the driver reads into a static buffer, validates the read return and the
+  reported length, switches on the H4 type at index 3, allocates the correct
+  Zephyr buffer (`bt_buf_get_evt` for EVT, `bt_buf_get_rx(BT_BUF_ACL_IN/ISO_IN)`
+  for ACL/ISO), bounds the parsed HCI length against both the received payload
+  and the net_buf tailroom, and delivers with `bt_hci_recv(dev, buf)`. SCO is
+  dropped (out of scope; never delivered by this controller). NULL allocations
+  (pool exhaustion, or a discardable advertising report under `K_NO_WAIT`) are
+  dropped, not dereferenced. See item 3.
+
+### 2.2 Transport primitives (the WHD seam)
+
+Provided by the cyw43_ll stack (`cyw43_ctrl.c`), consumed by the BT HCI driver:
+
+| Primitive | Contract |
+|-----------|----------|
+| `cyw43_bluetooth_hci_init()` | Ensure the chip is powered and BT firmware is loaded (`cyw43_ensure_bt_up`). Idempotent. Returns 0 on success. |
+| `cyw43_bluetooth_hci_write(buf, len)` | Write one framed HCI packet to the controller. Calls `cyw43_ensure_bt_up` first. Returns 0 on success. |
+| `cyw43_bluetooth_hci_read(buf, max, *len)` | Read one framed HCI packet; `*len` includes the 4-byte header. Returns non-zero (and leaves `*len` meaningless) on bus error — callers MUST check. |
+| `cyw43_ll_bt_has_work(ll)` | True when the controller has BT data pending; polled by the poll loop. |
+| `cyw43_ensure_up()` / `cyw43_ensure_bt_up()` | Idempotent bring-up: raise WL_REG_ON / load WiFi fw / load BT fw as needed. |
+
+A WHD transport must offer equivalents with the same framing and the same
+"ensure up is idempotent and ordering-independent" guarantee (§2.4).
+
+### 2.3 Single-lock poll-loop arbitration (the single-bus invariant)
+
+There is ONE gSPI bus shared by WiFi and BT, serialized by ONE recursive mutex
+(`zephyr_cyw43_lock`, owner-tracked, depth-counted; gives priority inheritance).
+
+- A single **cooperative** poll thread (`zephyr_cyw43_event_poll_thread`) is the
+  sole bus reader. It waits on `event_sem` (signalled by the WL_HOST_WAKE GPIO
+  ISR, or a 5 s timeout), takes the lock, and runs `cyw43_poll()` →
+  `cyw43_poll_func()`, which services **BT first then WiFi** under the lock:
+  `if (bt_has_work) cyw43_bluetooth_hci_process(); if (ll_has_work) ll_process_packets();`
+- Host TX paths (BT `cyw43_bluetooth_hci_write`, WiFi TX) take the SAME lock via
+  `CYW43_THREAD_ENTER/EXIT`, so no bus access ever races.
+- **Priority rule (item 4, critical):** the poll thread MUST be cooperative (the
+  cyw43_ll relies on no-preemption for implicit mutual exclusion — making it
+  preemptible corrupts state and asserts) but at the **LOWEST** cooperative
+  priority (`K_PRIO_COOP(CONFIG_NUM_COOP_PRIORITIES-1)` == -1). At the highest
+  coop priority it starved the Bluetooth host RX workqueue (coop -8): HCI events
+  were read off the bus but never delivered, and `bt_hci_cmd_send_sync` timed out
+  ("Controller unresponsive") under concurrent WiFi+BT load. At the lowest coop
+  priority the poll hook's `k_yield()` releases the CPU to the RX/TX consumers.
+- A WHD transport sharing the bus must keep this single-lock, single-reader,
+  BT-first, lowest-coop-priority arrangement (or an equivalent that guarantees
+  HCI command-completes are delivered within `HCI_CMD_TIMEOUT` under WiFi load).
+
+### 2.4 Init / power ordering (item 5)
+
+- One chip-enable, **WL_REG_ON**, powers the whole CYW43439 (WiFi+BT). No
+  separate BT_REG_ON on the Pico W/2 W.
+- WL_REG_ON is raised at WiFi driver init (POST_KERNEL) and WiFi firmware loads
+  then, independent of association; it is only lowered by `cyw43_deinit()`.
+- BT firmware loads lazily on the first BT op (`cyw43_ensure_bt_up`).
+- `wifi disconnect` is `cyw43_wifi_leave()` only — it does NOT drop WL_REG_ON, so
+  BT is unaffected.
+- Therefore all init orders work (BT-only, WiFi-then-BT, BT-then-WiFi), and BT
+  survives WiFi association cycling. A WHD transport must keep `ensure_up`
+  idempotent and never tie BT liveness to WiFi association state.
+
+### 2.5 BD_ADDR derivation (item 1)
+
+The controller derives its BT **public** address from the WiFi MAC **+ 1**
+(48-bit big-endian increment), read from OTP. The driver's `CONFIG_BT_HCI_SETUP`
+hook reads the controller BD_ADDR (HCI `Read_BD_ADDR`) and verifies it equals
+`cyw43_state.mac + 1`, failing loudly on a zero/broadcast address. Stable across
+≥10 cold boots. A WHD transport should expose the same derivation/verification.
+
+### 2.6 Controller capability notes (CYW4343A2 BT firmware)
+
+- HCI 5.2, manufacturer 0x0131 (Infineon/Cypress).
+- Does **not** support LE Extended Advertising (HCI 0x2036/0x203a → "Unknown HCI
+  Command"). Use legacy advertising only.
+- Does **not** support LE ISO (`iso listen` → -ENOTSUP). No CIS/BIS audio.
+- These are controller-firmware limits, not driver limits; relevant to what BLE
+  features the coexistence scope can offer.
+
