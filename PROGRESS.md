@@ -324,13 +324,22 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
 UART is wired and working (done). Console driven via test/coex/console.py.
 
 ## NEXT UP (resume pointer)
-M0.0, M0.1, items 1-6, REF VERIFIED. SOAK: fault-blocker RESOLVED — zero faults
-at moderate load (see "BLE-connection command-timeout" + SOAK row). Remaining for
-a full SOAK pass:
-  1. Occasional BLE disconnect under sustained load (no crash). Investigate the
-     connection supervision timeout / connection params / WiFi-RX-burst
-     correlation. test/coex/soak.sh + ble_central.py are the tools.
-  2. Run the full gate: 2h x N SWD-reset cold boots (scope = operator call).
+M0.0, M0.1, items 1-6, REF VERIFIED. SOAK: fault-blocker RESOLVED; disconnects
+gone (0/6). ONE residual: cybt bt2host-ring overflow under sustained moderate
+WiFi load (~33% of 75s cycles) = cooperative-thread starvation (see "residual
+cybt overflow" for full analysis + 3 options).
+  -> NEXT (most promising, option a): raise the poll thread ABOVE the BT RX WQ
+     (e.g. K_PRIO_COOP s.t. it's just above CONFIG_BT_RX_PRIO == coop -8, try
+     coop -9) so the poll always drains the bt2host ring before it overflows.
+     Then FULLY re-verify (priority change = wide blast radius): the 6-cycle
+     soak (expect 0 faults), the item-4 advertise+net-ping coex, the scan-flood
+     case (watch for a re-introduced command timeout -- it was a console
+     artifact), cold-boot BD_ADDR (item 1), and the RX stress (item 3). WiFi-only
+     + full builds green.
+  -> Then run the full gate: 2h x N SWD-reset cold boots (scope = operator call).
+Tools: build_soak (-DCONFIG_APP_BLE_PERIPHERAL=y + soak.conf), test/coex/soak.sh
+(gdb fault-check; net ping blocks the shell so use gdb for liveness),
+ble_central.py (teardown disconnect no longer false-flags). Board: canonical app.
 Soak build: -DCONFIG_APP_BLE_PERIPHERAL=y (+ test/coex/soak.conf). Drive with
 test/coex/soak.sh (gdb fault-check is reliable; NOTE: `net ping` blocks the
 shell, so use gdb -- not console uptime -- to check liveness during load).
