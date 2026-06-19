@@ -45,6 +45,30 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | NOT PASSING (characterized) | test/coex/results/soak_characterization_20260619.md — live BLE connect+subscribe faults the controller FREQUENTLY (within seconds), with/without WiFi load. Gated by the cybt_shared_bus/controller command-timeout. Shell-driven coex is solid. |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | VERIFIED | REFERENCE.md §2 — HCI-over-gSPI framing, transport primitives, single-lock poll arbitration + poll-priority rule, init/power ordering, BD_ADDR derivation, controller caps. |
 
+## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
+ROOT CAUSE: I_HMB_FC_CHANGE (the BT "data ready" interrupt flag in
+SDIO_INT_STATUS) has EDGE semantics — set once when BT data arrives, cleared by
+cyw43_ll_bt_has_work() after a read. But cyw43_bluetooth_hci_process() read only
+ONE packet per assertion. When the controller batched several HCI packets under
+one assertion (a connection event + the command-complete the host blocks on in
+bt_hci_cmd_send_sync), the rest were stranded until the next assertion -> 10s
+timeout -> oops. (CYW43_CLEAR_SDIO_INT defaults to 0, so WiFi does NOT clear the
+flag — the bug is one-packet-per-assertion, not a WiFi/BT flag race. An earlier
+out-of-band drain from the poll thread corrupted cybt_hci_read's static
+`available` accounting and panicked; reverted.)
+FIX: cyw43_bluetooth_hci_process() loops cyw43_bt_process_one() while
+cyw43_bluetooth_has_pending() (real bt2host ring indices via
+cybt_get_bt_buf_index), bounded CYW43_BT_DRAIN_MAX. Stays on the normal
+cybt_hci_read path.
+RESULT: live notify peripheral now streams cleanly with NO WiFi load (387 notif
+/40s, 9.7/s, 0 stalls, no fault) — was a hard fault on subscribe before. Under
+EXTREME load (Pico ping 100/s + host ping + BLE) MTBF jumped from ~0 to ~37s
+(648 notif over 3 cycles) but 2/3 still faulted -> residual under extreme load.
+Characterization artifacts: test/coex/results/soak_*.log.
+NEXT: confirm fault type under extreme load (cybt overflow panic vs timeout);
+test realistic/moderate load (the 100/s ping flood may itself be the stressor);
+the soak gate needs zero faults under its load.
+
 ## Item 4 RESOLVED (poll-thread priority inversion) — analysis
 ROOT CAUSE: the cyw43 shared-bus poll thread (sole gSPI reader; feeds the BT
 host RX workqueue at coop -8 and WiFi RX) was created K_PRIO_COOP(2) == -14, the
