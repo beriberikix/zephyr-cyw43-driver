@@ -1,0 +1,79 @@
+/ {
+	chosen {
+		zephyr,bt_hci = &cyw43_bt_hci;
+	};
+};
+
+/*
+ * The upstream rpi_pico2_rp2350a_m33_w board DTS defines, under &pio0,
+ * a pio0_spi0 PIO-SPI controller containing an "infineon,airoc-wifi"
+ * child (the AIROC/WHD driver path) with its own "infineon,cyw43-gpio"
+ * child. This module uses the georgerobotics cyw43_ll stack instead, so
+ * we replace the entire pio0_spi0 subtree with our own module node.
+ *
+ * Deleting and recreating pio0_spi0 removes the upstream airoc-wifi@0
+ * node (preventing a duplicate unit-address and a duplicate
+ * "infineon,cyw43-gpio" device that would collide with this module's
+ * local gpio driver).
+ */
+
+/*
+ * pio0_spi0 KEEPS the "raspberrypi,pico-spi-pio" compatible: this module's bus
+ * driver (cyw43_bus_pio_spi.c) talks to the CYW43 via spi_transceive_dt() over
+ * the upstream PIO-SPI controller (CONFIG_SPI_RPI_PICO_PIO), with the
+ * infineon,cyw43 node as its SPI device child (SPI_DT_SPEC_GET). The module's
+ * Kconfig select-s SPI + SPI_RPI_PICO_PIO for exactly this reason; the upstream
+ * driver is USED as the transport, not in conflict. We reuse the board's
+ * cs/clk/sio pin choices (GP25/GP29/GP24) and pio0_spi0_default pinctrl.
+ */
+/delete-node/ &pio0_spi0;
+
+&pio0 {
+	status = "okay";
+
+	pio0_spi0: pio0_spi0 {
+		compatible = "raspberrypi,pico-spi-pio";
+		clocks = <&clocks RPI_PICO_CLKID_CLK_SYS>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		cs-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
+		clk-gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+		sio-gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+		pinctrl-0 = <&pio0_spi0_default>;
+		pinctrl-names = "default";
+		status = "okay";
+
+		infineon_cyw43_module: infineon_cyw43_module@0 {
+			compatible = "infineon,cyw43";
+			reg = <0x0>;
+			clocks = <&clocks RPI_PICO_CLKID_CLK_SYS>;
+
+			spi-max-frequency = <1000000>;
+
+			wl-on-gpios = <&gpio0 23 GPIO_ACTIVE_HIGH>;
+			bus-select-gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+			host-wake-gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+
+			pinctrl-0 = <&airoc_wifi_default>;
+			pinctrl-1 = <&airoc_wifi_host_wake>;
+			pinctrl-names = "default", "host_wake";
+
+			status = "okay";
+
+			cyw43_led: cyw43_led { /* Pico W LED is on CYW43439 GPIO 0 */
+				compatible = "infineon,cyw43-led";
+			};
+
+			cyw43_gpio: cyw43_gpio {
+				compatible = "infineon,cyw43-gpio";
+				gpio-controller;
+				#gpio-cells = <2>;
+				ngpios = <3>;
+			};
+
+			cyw43_bt_hci: cyw43_bt_hci {
+				compatible = "infineon,cyw43-bt-hci";
+			};
+		};
+	};
+};

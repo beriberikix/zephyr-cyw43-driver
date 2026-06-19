@@ -14,7 +14,7 @@ manifest:
   projects:
     - name: zephyr
       remote: zephyrproject-rtos
-      revision: main
+      revision: 44af4534166bad6cec2f5a6eb226021260b9c49d
       import:
         # By using name-allowlist we can clone only the modules that are
         # strictly needed by the application.
@@ -22,4 +22,5 @@ manifest:
           - cmsis_6      # required by the ARM port
           - hal_rpi_pico
           - mbedtls
+          - tf-psa-crypto  # required by mbedtls 4.x (PSA crypto backend)
           - hal_infineon

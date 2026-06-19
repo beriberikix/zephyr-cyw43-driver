@@ -37,7 +37,8 @@ static uint8_t __noinit cyw43_rxbuf[MAX_BT_MSG_SIZE + CYW43_PACKET_HEADER_SIZE];
 static uint8_t __noinit cyw43_txbuf[CONFIG_NET_BUF_DATA_SIZE + CYW43_PACKET_HEADER_SIZE];
 
 struct zephyr_cyw43_bt_hci_data {
-	bt_hci_recv_t recv;
+	/* Must be first: the host stores its recv callback here via bt_hci_open(). */
+	struct bt_hci_driver_data common;
 };
 
 
@@ -50,24 +51,25 @@ static int zephyr_cyw43_bt_hci_init(const struct device *dev)
         return rv;
 }
 
-static int zephyr_cyw43_bt_hci_open(const struct device *dev, bt_hci_recv_t recv)
+static int zephyr_cyw43_bt_hci_open(const struct device *dev)
 {
-	int rv = 0;	
-	struct zephyr_cyw43_bt_hci_data *hci_data = dev->data;
-	
-	hci_data->recv = recv;
-	
-	return rv;
+	/*
+	 * The current Zephyr HCI model stores the host recv callback in
+	 * dev->data (struct bt_hci_driver_data) before calling open(); RX is
+	 * delivered with bt_hci_recv(). The controller transport is already
+	 * brought up in zephyr_cyw43_bt_hci_init(), so there is nothing more to
+	 * do here.
+	 */
+	ARG_UNUSED(dev);
+
+	return 0;
 }
 
 static int zephyr_cyw43_bt_hci_close(const struct device *dev)
 {
-	int rv = 0;
-	struct zephyr_cyw43_bt_hci_data *hci_data = dev->data;
-	
-	hci_data->recv = NULL;
-	
-	return rv;
+	ARG_UNUSED(dev);
+
+	return 0;
 }
 
 void cyw43_bluetooth_hci_process(void) {
@@ -80,7 +82,6 @@ void cyw43_bluetooth_hci_process(void) {
 	uint32_t cyw43_len;
 	uint32_t len;
 	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
-	struct zephyr_cyw43_bt_hci_data *hci_data = dev->data;
 	uint8_t packet_type;
 	uint8_t *rxmsg;
 	
@@ -138,7 +139,7 @@ void cyw43_bluetooth_hci_process(void) {
 	}
 	else {
 		net_buf_add_mem(buf, &rxmsg[1], len);
-		hci_data->recv(dev, buf);
+		bt_hci_recv(dev, buf);
 	}
 	LOG_DBG("Leaving cyw43_bluetooth_hci_process()\n");
 	
@@ -147,49 +148,55 @@ void cyw43_bluetooth_hci_process(void) {
 
 static int zephyr_cyw43_bt_hci_send(const struct device *dev, struct net_buf *buf)
 {
-	int rv=0;
-	
-	uint8_t packet_type = BT_HCI_H4_NONE;
+	int rv = 0;
+	uint8_t packet_type;
 	uint32_t cyw43_len = 0;
-	
-	LOG_DBG("zephyr_cyw43_bt_hci_send() bt_buf_get_type() = %s",
-		(bt_buf_get_type(buf) == BT_BUF_CMD ? "BT_BUF_CMD" :
-		 (bt_buf_get_type(buf) == BT_BUF_EVT ? "BT_BUF_EVT" :
-		  (bt_buf_get_type(buf) == BT_BUF_ACL_OUT ? "BT_BUF_ACL_OUT" :
-		   (bt_buf_get_type(buf) == BT_BUF_ISO_OUT ? "BT_BUF_ISO_OUT" :
-		    "Unknown")))));
-	
-	switch (bt_buf_get_type(buf)) {
-	case BT_BUF_CMD:
-		packet_type = BT_HCI_H4_CMD;
-		break;		
-	case BT_BUF_EVT:
-		packet_type = BT_HCI_H4_EVT;
-		break;
-	case BT_BUF_ACL_OUT:
-		packet_type = BT_HCI_H4_ACL;
-		break;
-	case BT_BUF_ISO_OUT:
-		packet_type = BT_HCI_H4_ISO;
+
+	ARG_UNUSED(dev);
+
+	/*
+	 * In the current Zephyr HCI model the host hands us a buffer whose first
+	 * byte is the H:4 packet-type indicator (BT_HCI_H4_CMD/ACL/ISO). The
+	 * CYW43 shared-bus write wants that same indicator in the 4th byte of
+	 * its 4-byte header, immediately followed by the rest of the buffer, so
+	 * we can copy buf->data verbatim starting at the indicator slot.
+	 */
+	if (buf->len < 1) {
+		LOG_ERR("zero-length HCI TX buffer");
+		rv = -EINVAL;
+		goto out;
+	}
+
+	packet_type = buf->data[0];
+
+	switch (packet_type) {
+	case BT_HCI_H4_CMD:
+	case BT_HCI_H4_ACL:
+	case BT_HCI_H4_ISO:
 		break;
 	default:
+		LOG_ERR("Unknown H4 TX packet type 0x%02x", packet_type);
 		rv = -EINVAL;
-		break;
+		goto out;
 	}
-	
-	if ((packet_type != BT_HCI_H4_NONE)) {
-		net_buf_push_u8(buf, packet_type);
 
-		memcpy(&cyw43_txbuf[CYW43_PACKET_HEADER_SIZE-1], buf->data, buf->len);
-		cyw43_len = buf->len + CYW43_PACKET_HEADER_SIZE;
-				
-		LOG_DBG("Calling cyw43_bluetooth_hci_write()");
-		rv = cyw43_bluetooth_hci_write(cyw43_txbuf, cyw43_len);
-		LOG_DBG("cyw43_bluetooth_hci_write() rv=%d", rv);
-		LOG_HEXDUMP_DBG(buf->data, buf->len, "HCI TX data:");
-		LOG_DBG("zephyr_cyw43_bt_hci_send(), len = %d\n", buf->len);		
-	}	
-	net_buf_unref(buf);	
+	if (buf->len + (CYW43_PACKET_HEADER_SIZE - 1) > sizeof(cyw43_txbuf)) {
+		LOG_ERR("HCI TX buffer too long: %u", buf->len);
+		rv = -EMSGSIZE;
+		goto out;
+	}
+
+	memcpy(&cyw43_txbuf[CYW43_PACKET_HEADER_SIZE - 1], buf->data, buf->len);
+	cyw43_len = buf->len + CYW43_PACKET_HEADER_SIZE;
+
+	LOG_DBG("Calling cyw43_bluetooth_hci_write() type=0x%02x", packet_type);
+	rv = cyw43_bluetooth_hci_write(cyw43_txbuf, cyw43_len);
+	LOG_DBG("cyw43_bluetooth_hci_write() rv=%d", rv);
+	LOG_HEXDUMP_DBG(buf->data, buf->len, "HCI TX data:");
+	LOG_DBG("zephyr_cyw43_bt_hci_send(), len = %d\n", buf->len);
+
+out:
+	net_buf_unref(buf);
 	return rv;
 }
 

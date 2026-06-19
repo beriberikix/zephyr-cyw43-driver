@@ -348,13 +348,13 @@ static int zephyr_cyw43_enable_ap(zephyr_cyw43_dev_t *zephyr_cyw43_device)
         static struct in_addr netmask;
         
         if (net_addr_pton(AF_INET, CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_ADDRESS, &addr)) {
-            NET_ERR("Invalid address: %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_ADDRESS);
+            LOG_ERR("Invalid address: %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_ADDRESS);
             return rv;
         }
         LOG_INF("Set IP addr to %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_ADDRESS);
         
         if (net_addr_pton(AF_INET, CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_NETMASK, &netmask)) {
-            NET_ERR("Invalid netmask: %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_NETMASK);
+            LOG_ERR("Invalid netmask: %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_NETMASK);
             return rv;
         }
         LOG_INF("Set IP netmask to %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_NETMASK);
@@ -517,8 +517,10 @@ static void zephyr_cyw43_iface_init(struct net_if *iface)
 }
 
 int zephyr_cyw43_iface_status(const struct device *dev,
+                              struct net_if *iface,
                               struct wifi_iface_status *status)
 {
+        ARG_UNUSED(iface);
         LOG_DBG("Calling iface_status()\n");
 
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
@@ -589,9 +591,11 @@ int zephyr_cyw43_iface_status(const struct device *dev,
 }
 
 static int zephyr_cyw43_mgmt_scan(const struct device *dev,
+                                  struct net_if *iface,
                                   struct wifi_scan_params *params,
                                   scan_result_cb_t cb)
 {
+        ARG_UNUSED(iface);
 
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
 
@@ -613,10 +617,13 @@ static int zephyr_cyw43_mgmt_scan(const struct device *dev,
 }
 
 static int zephyr_cyw43_mgmt_connect(const struct device *dev,
+                                     struct net_if *iface,
                                      struct wifi_connect_req_params *params)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
         int rv=0;
+
+        ARG_UNUSED(iface);
 
         LOG_DBG("");
 
@@ -655,9 +662,12 @@ static int zephyr_cyw43_mgmt_connect(const struct device *dev,
         return rv;
 }
 
-static int zephyr_cyw43_mgmt_disconnect(const struct device *dev)
+static int zephyr_cyw43_mgmt_disconnect(const struct device *dev,
+                                        struct net_if *iface)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
+
+        ARG_UNUSED(iface);
         LOG_DBG("");
         zephyr_cyw43_lock(zephyr_cyw43_device);
         zephyr_cyw43_device->req = ZEPHYR_CYW43_REQ_DISCONNECT;
@@ -667,10 +677,13 @@ static int zephyr_cyw43_mgmt_disconnect(const struct device *dev)
 }
 
 static int zephyr_cyw43_mgmt_ap_enable(const struct device *dev,
+                                       struct net_if *iface,
                                        struct wifi_connect_req_params *params)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
         int rv = 0;
+
+        ARG_UNUSED(iface);
 
         LOG_DBG("Calling mgmt_ap_enable()\n");
 
@@ -707,10 +720,12 @@ static int zephyr_cyw43_mgmt_ap_enable(const struct device *dev,
         return rv;
 }
 
-static int zephyr_cyw43_mgmt_ap_disable(const struct device *dev)
+static int zephyr_cyw43_mgmt_ap_disable(const struct device *dev,
+                                        struct net_if *iface)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
 
+        ARG_UNUSED(iface);
         LOG_DBG("Calling mgmt_ap_disable()\n");
         zephyr_cyw43_lock(zephyr_cyw43_device);
         zephyr_cyw43_device->req = ZEPHYR_CYW43_REQ_DISABLE_AP;
@@ -719,11 +734,14 @@ static int zephyr_cyw43_mgmt_ap_disable(const struct device *dev)
         return 0;
 }
 
-static int zephyr_cyw43_mgmt_set_pm(const struct device *dev, struct wifi_ps_params *params)
+static int zephyr_cyw43_mgmt_set_pm(const struct device *dev, struct net_if *iface,
+                                    struct wifi_ps_params *params)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
 
         uint8_t pm_mode;
+
+        ARG_UNUSED(iface);
         uint16_t pm2_sleep_ret_ms = 0;
         uint8_t li_beacon_period = 0;
         uint8_t li_dtim_period = 0;
@@ -770,9 +788,12 @@ static int zephyr_cyw43_mgmt_set_pm(const struct device *dev, struct wifi_ps_par
         return 0;
 }
 
-static int zephyr_cyw43_pm_status(const struct device *dev, struct wifi_ps_config *config)
+static int zephyr_cyw43_pm_status(const struct device *dev, struct net_if *iface,
+                                  struct wifi_ps_config *config)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
+
+        ARG_UNUSED(iface);
         LOG_DBG("");
 
         uint8_t pm_mode;
@@ -967,10 +988,12 @@ static void zephyr_cyw43_register_cb()
 }
 
 #if defined(CONFIG_NET_STATISTICS_WIFI)
-static int zephyr_cyw43_wifi_stats(const struct device *dev, struct net_stats_wifi *stats)
+static int zephyr_cyw43_wifi_stats(const struct device *dev, struct net_if *iface,
+                                   struct net_stats_wifi *stats)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
 
+        ARG_UNUSED(iface);
         stats->bytes.received = zephyr_cyw43_device->stats.bytes.received;
         stats->bytes.sent = zephyr_cyw43_device->stats.bytes.sent;
         stats->pkts.rx = zephyr_cyw43_device->stats.pkts.rx;
