@@ -34,8 +34,8 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 
 | # | Item | Status | Artifact |
 |---|------|--------|----------|
-| M0.0 | Reliable single-command flash + a console the loop can drive (shell round-trip); image confirmed running via gdb | IN-PROGRESS | flash+gdb PROVEN (docs/artifacts below); console round-trip BLOCKED on console transport (see "Console blocker") |
-| M0.1 | Driver app builds+flashes+boots on Pico 2 W with WIFI+BT in one image; `wifi connect` associates AND `bt init`+advertise succeed (rebase to 4.4 + add rpi_pico2 overlay + reconcile cyw43 GPIO binding) | IN-PROGRESS | builds+flashes+boots PROVEN (app idles healthy via gdb); wifi/bt functional test pending console |
+| M0.0 | Reliable single-command flash + a console the loop can drive (shell round-trip); image confirmed running via gdb | VERIFIED | docs/artifacts/m0.0_console_20260619.log (flash Verified OK + gdb idle + `kernel version`->`Zephyr version 4.4.99`) |
+| M0.1 | Driver app builds+flashes+boots on Pico 2 W with WIFI+BT in one image; `wifi connect` associates AND `bt init`+advertise succeed (rebase to 4.4 + add rpi_pico2 overlay + reconcile cyw43 GPIO binding) | VERIFIED | docs/artifacts/m0.1_wifi_bt_20260619.log (STA COMPLETED, DHCP 192.168.11.20; bt init ok, id 88:A2:9E:D1:6D:A0; advertising started) |
 | 1 | HCI setup / BD_ADDR (stable correct public addr across 10 cold boots) | TODO | |
 | 2 | SCO/ISO separation (ISO correct; SCO routed or cleanly gated) | TODO | |
 | 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | TODO | |
@@ -63,7 +63,14 @@ checkpatch clean.
   cyw43 GPIO driver must be reconciled to upstream's binding schema in M0.1.
 - Open question for M0.0: does the Zephyr RP2350 image run after openocd flash (gdb `bt`)?
 
-## Console blocker (M0.0/M0.1 gate)
+## Console: RESOLVED (UART wired, working)
+Operator wired the probe "U" connector to Pico UART0 (probe TX->GP1, RX->GP0, GND).
+Round-trip confirmed: `python test/coex/console.py send "kernel version"` -> "Zephyr
+version 4.4.99". Boot banner, CYW43 fw load, BT fw download, and the uart:~$ shell all
+visible. The loop drives the shell via test/coex/console.py (send/capture). No reflash
+needed between console calls; the app stays up. Reset+capture recipe is in the changelog.
+
+## Console blocker (historical — M0.0/M0.1 gate, now resolved)
 The WIFI+BT app boots and idles healthy (gdb backtrace: arch_cpu_idle -> idle ->
 z_thread_entry; no fault), but UART produces NO output on boot or on shell input.
 The app's console is uart0 (GP0/GP1) with CONFIG_UART_CONSOLE=y, so the silence is
@@ -93,6 +100,13 @@ The app is already flashed (build_pico2/zephyr/zephyr.elf) and boots healthy; no
 - gdb run-confirm of WIFI+BT app: idles in arch_cpu_idle (healthy). Logged to PROGRESS.
 
 ## Changelog (newest first)
+- M0.0 + M0.1 VERIFIED on hardware. UART wired by operator; console round-trip works.
+  WiFi STA associates to "819 Paramount" (DHCP 192.168.11.20); `bt init` ok (public
+  addr 88:A2:9E:D1:6D:A0 = WiFi MAC 88:A2:9E:D1:6D:9F + 1, manuf 0x0131, HCI 5.2);
+  `bt advertise on` -> "Advertising started"; WiFi+BT concurrent, uptime healthy.
+  Artifacts: docs/artifacts/m0.0_console_20260619.log, m0.1_wifi_bt_20260619.log.
+  Note for item 1: bt_hci_core warns "Num of Controller's ACL packets != ACL
+  bt_conn_tx contexts (8 != 3)" at bt init — benign but worth revisiting.
 - M0.1 build reconcile (Zephyr 4.4 drift): added app/boards/rpi_pico2_rp2350a_m33_w.overlay
   (georgerobotics infineon,cyw43 over raspberrypi,pico-spi-pio; deletes upstream AIROC
   airoc-wifi node; reuses board pinctrl); prj.conf BT_PERIPHERAL/BT_CENTRAL (BT_CONN);
