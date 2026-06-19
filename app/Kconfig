@@ -6,6 +6,14 @@ config WIFI_PSK
 	string "WIFI PSK - Network password key"
 	default ""
 
+config APP_WIFI_AUTOCONNECT
+	bool "Auto-connect to WIFI_SSID at boot"
+	default y
+	help
+	  When set, main() associates to CONFIG_WIFI_SSID at boot. Disable to bring
+	  the radio up without a WiFi association (e.g. a BT-only product, or to
+	  exercise the BT-then-WiFi / BT-only init orders).
+
 menu "Zephyr"
 source "Kconfig.zephyr"
 endmenu

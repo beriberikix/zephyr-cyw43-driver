@@ -40,7 +40,7 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | 2 | SCO/ISO separation (ISO correct; SCO routed or cleanly gated) | VERIFIED | docs/artifacts/item2_iso_smoke_20260619.log (ISO RX guarded by CONFIG_BT_ISO w/ BT_BUF_ISO_IN; SCO dropped not mis-routed; ISO build green; bt init+advertise+WiFi coex healthy. Controller lacks ISO HW -> no ISO/SCO traffic, routing verified by build+code) |
 | 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | VERIFIED | docs/artifacts/item3_rx_stress_20260619.log — 120s forced-exhaustion (discardable=1) flood, 542 reports, device responsive throughout (uptime 17->150s), 0 faults. RESULT: PASS. |
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | VERIFIED | docs/artifacts/item4_coex_arbitration_20260619.log — root-caused poll-thread priority inversion; fixed (coop -14 -> -1); realistic coex (advertise+WiFi load+HCI cmds) 4 rounds clean. Full 2h soak = SOAK row. |
-| 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | TODO | |
+| 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | VERIFIED | docs/artifacts/item5_initorder_20260619.log — BT-only, WiFi-then-BT, BT-then-WiFi all clean; BT survives WiFi disconnect cycles (shared power not dropped). |
 | 6 | Firmware blob pinned + provenance/license recorded | TODO | |
 | SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | TODO | |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | TODO | |
@@ -102,6 +102,28 @@ Hypothesis / where to look (item 4):
   - This is the heart of the coexistence contract for REFERENCE.md.
 Repro tooling: test/coex/rx_stress.sh (flood), and the (a) case:
   bt init; bt scan on; net ping -c 5 192.168.11.1  (on build_pico2 image).
+
+## Item 5 — shared power line (analysis)
+The CYW43439 has ONE chip-enable, WL_REG_ON; there is no separate BT_REG_ON on
+the Pico W / Pico 2 W (BT power is internal to the module). So WiFi and BT share
+power. Driver behavior:
+- WL_REG_ON is driven HIGH at WiFi driver init (POST_KERNEL) and the WiFi
+  firmware is loaded then (boot log "cyw43 loaded ok"), independent of any
+  association. WL_REG_ON is only driven LOW by cyw43_deinit() (not used here).
+- BT firmware is loaded lazily on the first BT op: cyw43_ensure_bt_up() ->
+  cyw43_ensure_up() (idempotent, brings the chip up if needed) -> cyw43_btbus_init().
+- `wifi disconnect` -> cyw43_wifi_leave() only (leaves the AP); it does NOT drop
+  WL_REG_ON, so BT is unaffected.
+Consequence: every init order works because the chip is already powered before
+either stack's firmware loads. Verified on hardware (item5 artifact):
+  - BT-only (CONFIG_APP_WIFI_AUTOCONNECT=n, no association): bt init/advertise
+    clean, WiFi stays DISCONNECTED.
+  - WiFi-then-BT: associate, then bt init -> clean.
+  - BT-then-WiFi: bt init/advertise first, then `wifi connect` -> WiFi associates
+    + DHCP, BT stays up.
+  - BT survives 3x WiFi disconnect (id-show works each time).
+Added CONFIG_APP_WIFI_AUTOCONNECT (app/Kconfig, default y) so a BT-only / BT-first
+boot is buildable (-DCONFIG_APP_WIFI_AUTOCONNECT=n).
 
 ## Build matrix (keep green)
 - Combined WiFi+BT (app/prj.conf): GREEN, hardware-verified (M0.1, item 1).
@@ -182,6 +204,12 @@ coex) after ANY RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- Item 5 (shared WL_REG_ON power / init order) VERIFIED. Added
+  CONFIG_APP_WIFI_AUTOCONNECT (default y) to make a BT-only / BT-first boot
+  buildable. Hardware-tested all three init orders (BT-only, WiFi-then-BT,
+  BT-then-WiFi) clean + BT survives WiFi disconnect cycles. Documented the
+  single-WL_REG_ON shared-power model above. Artifact:
+  docs/artifacts/item5_initorder_20260619.log (PSK redacted).
 - Item 4 VERIFIED (8b82c09): fixed poll-thread priority inversion (coop -14 ->
   -1 lowest coop) starving the BT command path; realistic coex (advertise+WiFi
   load+HCI cmds) 4 rounds clean. Item 3 re-verified clean with the fix in place:
