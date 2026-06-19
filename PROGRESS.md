@@ -304,9 +304,21 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
 UART is wired and working (done). Console driven via test/coex/console.py.
 
 ## NEXT UP (resume pointer)
-M0.0, M0.1, items 1-6, REF VERIFIED. Remaining: SOAK — BLOCKED on the
-"BLE-connection command-timeout" above (a real BLE connect+subscribe faults the
-controller even without WiFi load).
+M0.0, M0.1, items 1-6, REF VERIFIED. SOAK: fault-blocker RESOLVED — zero faults
+at moderate load (see "BLE-connection command-timeout" + SOAK row). Remaining for
+a full SOAK pass:
+  1. Occasional BLE disconnect under sustained load (no crash). Investigate the
+     connection supervision timeout / connection params / WiFi-RX-burst
+     correlation. test/coex/soak.sh + ble_central.py are the tools.
+  2. Run the full gate: 2h x N SWD-reset cold boots (scope = operator call).
+Soak build: -DCONFIG_APP_BLE_PERIPHERAL=y (+ test/coex/soak.conf). Drive with
+test/coex/soak.sh (gdb fault-check is reliable; NOTE: `net ping` blocks the
+shell, so use gdb -- not console uptime -- to check liveness during load).
+Board holds the canonical app (no peripheral). PROBE-GUARD reminder: never put
+`pkill -f '[g]db'` in the same Bash call as a gdb path (self-match -> exit 144);
+guard in a separate call.
+
+## (historical) was-NEXT pointer below:
   -> NEXT: debug + fix the BLE-connection command-timeout (see that section's
      plan; hypothesis (d) drain-BT-per-poll is most promising). Then re-verify a
      stable connected BLE peripheral, THEN run the soak (network is ready:
