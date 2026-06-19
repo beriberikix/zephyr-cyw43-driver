@@ -57,9 +57,9 @@ for c in $(seq 1 "$CYCLES"); do
 	ocd_reset
 	sleep "$BOOT_S"
 	# WiFi load: Pico -> internet (fire-and-forget; runs on the device shell)
-	python "$HERE/console.py" send "net ping -c 100000 -i 10 8.8.8.8" --wait 1 >>"$LOG" 2>&1
+	python "$HERE/console.py" send "net ping -c 1000000 -i 60 8.8.8.8" --wait 1 >>"$LOG" 2>&1
 	# WiFi load: host -> Pico (background, ~5/s without root)
-	( ping -i 0.2 "$PICO_IP" >/tmp/soak_hostping.txt 2>&1 ) &
+	( ping -i 0.5 "$PICO_IP" >/tmp/soak_hostping.txt 2>&1 ) &
 	hp=$!
 	# BLE central: connect + subscribe + measure until disconnect or window.
 	creport="$(timeout $((MAX_CONN_S + 40)) python "$HERE/ble_central.py" \

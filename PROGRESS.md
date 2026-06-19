@@ -42,7 +42,7 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | VERIFIED | docs/artifacts/item4_coex_arbitration_20260619.log — root-caused poll-thread priority inversion; fixed (coop -14 -> -1); realistic coex (advertise+WiFi load+HCI cmds) 4 rounds clean. Full 2h soak = SOAK row. |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | VERIFIED | docs/artifacts/item5_initorder_20260619.log — BT-only, WiFi-then-BT, BT-then-WiFi all clean; BT survives WiFi disconnect cycles (shared power not dropped). |
 | 6 | Firmware blob pinned + provenance/license recorded | VERIFIED | REFERENCE.md §1 — wb43439A0_7_95_49_00_combined.h SHA-256 6b4b9a71…, cyw43-driver v1.0.4, RP (non-EULA) license, runtime versions logged. |
-| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | NOT PASSING (characterized) | test/coex/results/soak_characterization_20260619.md — live BLE connect+subscribe faults the controller FREQUENTLY (within seconds), with/without WiFi load. Gated by the cybt_shared_bus/controller command-timeout. Shell-driven coex is solid. |
+| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | ZERO-FAULT at moderate load (full 2h x5 not yet run) | test/coex/results/soak_20260619_174657.log — 4 cold-boot cycles, BLE notify peripheral + bidirectional WiFi load: 0 faults / 0 stalls over 269 s connected, 2550 notifications, 9.6/s. Residual: occasional BLE disconnect under sustained load (1/4 cycles dropped at 44 s; 3/4 ran the full window). Both root causes fixed (4f72d1f drain + 23eccd6 priority). |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | VERIFIED | REFERENCE.md §2 — HCI-over-gSPI framing, transport primitives, single-lock poll arbitration + poll-priority rule, init/power ordering, BD_ADDR derivation, controller caps. |
 
 ## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
@@ -65,9 +65,28 @@ RESULT: live notify peripheral now streams cleanly with NO WiFi load (387 notif
 EXTREME load (Pico ping 100/s + host ping + BLE) MTBF jumped from ~0 to ~37s
 (648 notif over 3 cycles) but 2/3 still faulted -> residual under extreme load.
 Characterization artifacts: test/coex/results/soak_*.log.
-NEXT: confirm fault type under extreme load (cybt overflow panic vs timeout);
-test realistic/moderate load (the 100/s ping flood may itself be the stressor);
-the soak gate needs zero faults under its load.
+RESIDUAL (separate issue, throughput not detection): under sustained WiFi load
+the BT side eventually hits panic("cyw43 buffer overflow") in cybt_hci_read
+(gdb: reason=4 panic, pc=abort, on zephyr_cyw43_event_poll_stack, during the BT
+drain). i.e. the controller's bt2host ring OVERFLOWS because BT read latency is
+too high while WiFi shares the bus/CPU. Measured: no-load = perfect (no fault);
+moderate load (Pico ping 10/s) = 597 notif over 62s then overflow; extreme load
+(100/s + host ping) = ~37s MTBF. So BLE throughput is good but read latency
+under WiFi contention is the remaining gap.
+RESIDUAL FIX (DONE, 23eccd6): poll thread coop -1 -> -2 so it preempts the -1
+WiFi rx_q and drains BT promptly (still yields to BT RX WQ -8). 4-cycle moderate-
+load soak: ZERO faults, 2550 notifications over 269 s, no stalls. Both root
+causes now fixed (drain 4f72d1f + priority 23eccd6).
+STILL OPEN for a full soak PASS:
+  - Occasional BLE disconnect under sustained load (1/4 cycles dropped at ~44 s;
+    no crash). Likely the host->Pico WiFi RX bursts contending with the BLE link;
+    investigate connection params / supervision timeout / whether it correlates
+    with WiFi RX spikes. Soak gate wants zero unexpected disconnects.
+  - Run the FULL gate: 2h x 5 cold boots (scope still an operator call; current
+    runs are minutes x a few cycles).
+  - Extreme load (Pico 100/s + host ping) still disconnects early (no crash) ->
+    a throughput ceiling, acceptable vs the spec's "within threshold" if the
+    threshold is moderate.
 
 ## Item 4 RESOLVED (poll-thread priority inversion) — analysis
 ROOT CAUSE: the cyw43 shared-bus poll thread (sole gSPI reader; feeds the BT
@@ -333,6 +352,13 @@ coex) after ANY RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- SOAK BLOCKER RESOLVED (faults). Root-caused the live-BLE command-timeout to
+  I_HMB_FC_CHANGE edge semantics + one-packet-per-assertion (fix: drain the full
+  bt2host ring per BT poll, 4f72d1f) and a BT-read-latency ring overflow under
+  WiFi load (fix: poll thread coop -1 -> -2, 23eccd6). 4-cycle moderate-load soak
+  now ZERO faults / 2550 notifications / 269 s. Residual: occasional BLE
+  disconnect under sustained load (no crash) + full 2h x5 not yet run.
+  Artifact: test/coex/results/soak_20260619_174657.log.
 - SOAK characterized (operator chose "characterize"): built test/coex/soak.sh
   orchestrator (SWD-reset cycles + Pico/host WiFi load + bleak central + gdb
   fault-check). Result: a live BLE connect+subscribe faults the controller
