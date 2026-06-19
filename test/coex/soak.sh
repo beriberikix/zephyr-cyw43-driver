@@ -20,6 +20,15 @@ MAX_CONN_S="${2:-90}"
 PICO_IP="${3:-192.168.4.28}"
 BT_ADDR="${4:-88:A2:9E:D1:6D:A0}"
 BOOT_S=9
+# WiFi load knobs (env-overridable). Pico->internet ping interval (ms) and
+# host->Pico ping interval (s). Defaults = moderate. For the BOUNDED-load
+# certification (see PROGRESS "SOAK ROOT CAUSE") use a lighter load, e.g.
+# PICO_PING_MS=1000 HOST_PING_S=2.
+PICO_PING_MS="${PICO_PING_MS:-60}"
+HOST_PING_S="${HOST_PING_S:-0.5}"
+# Reset the host BlueZ adapter each cycle: it wedges after ~6 connect/disconnect
+# cycles (notif=0/conn=0). Set HOST_BT_RESET=0 to disable.
+HOST_BT_RESET="${HOST_BT_RESET:-1}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ELF="$(cd "$HERE/../.." && pwd)/build_soak/zephyr/zephyr.elf"
 OCD="$HOME/.pico-sdk/openocd/0.12.0+dev/openocd"
@@ -48,18 +57,23 @@ fault_check() {
 }
 
 : > "$LOG"
-echo "=== characterization soak $STAMP  cycles=$CYCLES max_conn=${MAX_CONN_S}s ===" | tee -a "$LOG"
+echo "=== characterization soak $STAMP  cycles=$CYCLES max_conn=${MAX_CONN_S}s load: pico_ping=${PICO_PING_MS}ms host_ping=${HOST_PING_S}s ===" | tee -a "$LOG"
 faults=0; total_conn=0; total_notif=0; clean_disc=0
 
 for c in $(seq 1 "$CYCLES"); do
 	echo "----- cycle $c/$CYCLES $(date -u +%FT%TZ) -----" | tee -a "$LOG"
+	# Host BlueZ adapter wedges after ~6 connect/disconnect cycles; reset it.
+	if [ "$HOST_BT_RESET" = "1" ]; then
+		bluetoothctl power off >/dev/null 2>&1; sleep 1
+		bluetoothctl power on  >/dev/null 2>&1; sleep 1
+	fi
 	pkill -f 'probe[-]rs' 2>/dev/null; pkill -x openocd 2>/dev/null; sleep 1
 	ocd_reset
 	sleep "$BOOT_S"
 	# WiFi load: Pico -> internet (fire-and-forget; runs on the device shell)
-	python "$HERE/console.py" send "net ping -c 1000000 -i 60 8.8.8.8" --wait 1 >>"$LOG" 2>&1
-	# WiFi load: host -> Pico (background, ~5/s without root)
-	( ping -i 0.5 "$PICO_IP" >/tmp/soak_hostping.txt 2>&1 ) &
+	python "$HERE/console.py" send "net ping -c 1000000 -i $PICO_PING_MS 8.8.8.8" --wait 1 >>"$LOG" 2>&1
+	# WiFi load: host -> Pico (background)
+	( ping -i "$HOST_PING_S" "$PICO_IP" >/tmp/soak_hostping.txt 2>&1 ) &
 	hp=$!
 	# BLE central: connect + subscribe + measure until disconnect or window.
 	creport="$(timeout $((MAX_CONN_S + 40)) python "$HERE/ble_central.py" \
