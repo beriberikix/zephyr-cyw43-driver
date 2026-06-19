@@ -144,18 +144,19 @@ There is ONE gSPI bus shared by WiFi and BT, serialized by ONE recursive mutex
   hold the bus lock around every bus access on every path, TX included.
 - **Priority rule (item 4):** the poll thread MUST be cooperative (the cyw43_ll
   relies on no-preemption for implicit mutual exclusion — making it preemptible
-  corrupts state and asserts). It runs **one cooperative band above both BT
-  threads** — `K_PRIO_COOP(MIN(CONFIG_BT_RX_PRIO, CONFIG_BT_HCI_TX_PRIO) - 1)`
-  == coop -10, above the BT RX workqueue (-8) and BT HCI TX (-9) — so the sole
-  bus reader drains the controller's bt2host ring promptly under load. The
-  per-wake drain (`cyw43_bluetooth_hci_process` loops the full pending ring, then
-  the poll BLOCKS on `event_sem`) is what releases the CPU to the RX WQ for
-  delivery, so command-completes still arrive within `HCI_CMD_TIMEOUT`. (History:
-  the original highest-coop value -14 starved the RX WQ — events read but never
-  delivered → timeout; the intermediate lowest-coop -2 sat below the RX WQ so the
-  ring overflowed under load. Both fixed by -10 + the per-wake drain.)
+  corrupts state and asserts). It runs at **coop -2 (lowest cooperative band)**,
+  below the BT RX workqueue (-8). What delivers command-completes within
+  `HCI_CMD_TIMEOUT` is the **per-wake drain**: `cyw43_bluetooth_hci_process`
+  loops the full pending bt2host ring, then the poll BLOCKS on `event_sem`,
+  releasing the CPU to the RX WQ / WiFi RX / bt_tx. (History: the original
+  highest-coop -14 starved the RX WQ — events read but never delivered →
+  timeout, fixed by the per-wake drain. A later experiment moved the poll to
+  coop -10, one band ABOVE both BT threads, to chase the soak ring overflow; it
+  did NOT remove that fault — the overflow is a below-driver gSPI corruption,
+  §2.7 — and a high-priority poll over-drives the bus, so it was reverted to -2,
+  the value under which items 1–5 and the RX-flood stress verify clean.)
 - A WHD transport sharing the bus must keep this single-lock, single-reader,
-  BT-first arrangement with the bus reader prioritized above the BT consumers and
+  BT-first arrangement with the bus reader prioritized below the BT consumers and
   every TX path holding the lock.
 
 See **§2.7** for a shared-bus coexistence limitation that survives this
@@ -193,15 +194,27 @@ hook reads the controller BD_ADDR (HCI `Read_BD_ADDR`) and verifies it equals
 
 ### 2.7 Shared-bus coexistence limitation — gSPI corruption under heavy load
 
-**Symptom.** Under *sustained heavy concurrent WiFi throughput* simultaneous with
-an active BLE connection, the Pico can take a kernel panic (K_ERR_KERNEL_PANIC)
-on the `bt_tx_processor` thread:
+**Symptom.** Under heavy gSPI bus traffic the Pico can take a kernel panic
+(K_ERR_KERNEL_PANIC, reason 4) in the cybt shared-bus code. Two observed
+triggers, same root cause:
+- *Sustained WiFi+BLE coexistence* (the soak): on the **TX** path, from
+  `bt_tx_processor`:
+  ```
+  tx_processor -> send_buf -> zephyr_cyw43_bt_hci_send -> cyw43_bluetooth_hci_write
+    -> cybt_hci_write_buf -> cybt_get_bt_buf_index
+    -> assert(ring_index < BTSDIO_FWBUF_SIZE)   # index read back >= 0x1000
+  ```
+- *Heavy BT advertising flood* (`bt scan on` in a dense RF area, the item-3
+  rx_stress): on the **RX** path, from the poll thread
+  (`zephyr_cyw43_event_poll_stack`) inside `cyw43_bluetooth_hci_process ->
+  cybt_hci_read`, when the controller's bt2host ring overflows / its indices
+  read back corrupt. Load-proportional: the original item-3 run (~4.5 reports/s)
+  was clean for 150 s; a denser environment (~7.5/s) faults within ~70 s.
 
-```
-tx_processor -> send_buf -> zephyr_cyw43_bt_hci_send -> cyw43_bluetooth_hci_write
-  -> cybt_hci_write_buf -> cybt_get_bt_buf_index
-  -> assert(ring_index < BTSDIO_FWBUF_SIZE)   # index read back >= 0x1000 (garbage)
-```
+Both are the same below-driver gSPI corruption; the host RX-buffer-pressure
+hardening (item 3: read-return checks, NULL-drop, length bounds) is correct and
+unchanged — this panic is in the transport beneath it, not a host-buffer
+NULL-deref.
 
 **Root cause (gdb-proven, not a host-side bug).** The BT TX path reads the
 controller's shared-memory ring indices over the gSPI backplane. At the panic the

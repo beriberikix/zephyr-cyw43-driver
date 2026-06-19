@@ -38,7 +38,7 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | M0.1 | Driver app builds+flashes+boots on Pico 2 W with WIFI+BT in one image; `wifi connect` associates AND `bt init`+advertise succeed (rebase to 4.4 + add rpi_pico2 overlay + reconcile cyw43 GPIO binding) | VERIFIED | docs/artifacts/m0.1_wifi_bt_20260619.log (STA COMPLETED, DHCP 192.168.11.20; bt init ok, id 88:A2:9E:D1:6D:A0; advertising started) |
 | 1 | HCI setup / BD_ADDR (stable correct public addr across 10 cold boots) | VERIFIED | docs/artifacts/item1_bdaddr_10boots_20260619.log (10/10 boots = 88:A2:9E:D1:6D:A0, distinct=1, STABLE; setup hook verified =WiFi MAC+1 all 10) |
 | 2 | SCO/ISO separation (ISO correct; SCO routed or cleanly gated) | VERIFIED | docs/artifacts/item2_iso_smoke_20260619.log (ISO RX guarded by CONFIG_BT_ISO w/ BT_BUF_ISO_IN; SCO dropped not mis-routed; ISO build green; bt init+advertise+WiFi coex healthy. Controller lacks ISO HW -> no ISO/SCO traffic, routing verified by build+code) |
-| 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | VERIFIED | docs/artifacts/item3_rx_stress_20260619.log — 120s forced-exhaustion (discardable=1) flood, 542 reports, device responsive throughout (uptime 17->150s), 0 faults. RESULT: PASS. |
+| 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | VERIFIED (host RX-buffer handling) — but heavy BT flood now hits the §2.7 below-driver cybt overflow | docs/artifacts/item3_rx_stress_20260619.log — original: 120s flood (~4.5 rpt/s), 542 reports, uptime 17->150s, 0 faults, PASS (the host NULL-drop/bounds code is correct + unchanged). RE-CHECK (gdb-liveness, denser RF ~7.5 rpt/s): test/coex/results/rxstress_coop2_drained_20260619.log — faults at ~70s in the POLL-thread cybt_hci_read path = the SAME below-driver gSPI corruption as the soak (REFERENCE §2.7), load-proportional, NOT a host-buffer defect. Not poll-priority-dependent (-2 and -10 both). Improved rx_stress.sh to gdb-liveness + documented UART-drain. |
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | VERIFIED | docs/artifacts/item4_coex_arbitration_20260619.log — root-caused poll-thread priority inversion; fixed (coop -14 -> -1); realistic coex (advertise+WiFi load+HCI cmds) 4 rounds clean. Full 2h soak = SOAK row. |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | VERIFIED | docs/artifacts/item5_initorder_20260619.log — BT-only, WiFi-then-BT, BT-then-WiFi all clean; BT survives WiFi disconnect cycles (shared power not dropped). |
 | 6 | Firmware blob pinned + provenance/license recorded | VERIFIED | REFERENCE.md §1 — wb43439A0_7_95_49_00_combined.h SHA-256 6b4b9a71…, cyw43-driver v1.0.4, RP (non-EULA) license, runtime versions logged. |
@@ -469,6 +469,21 @@ coex) after ANY RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- Reverted poll coop -10 -> -2 + re-characterized item 3 honestly. Re-running
+  rx_stress with a reliable gdb-liveness check (not a shell uptime probe, which
+  the flooded UART starves) showed the device FAULTS at ~70s under a dense BT
+  advertising flood -- in the POLL thread's cybt_hci_read path, i.e. the SAME
+  below-driver gSPI corruption as the soak (REFERENCE §2.7), confirmed
+  load-proportional (orig ~4.5 rpt/s clean 150s; now ~7.5 rpt/s faults ~70s) and
+  NOT poll-priority-dependent (coop -2 and -10 both fault). The poll -10
+  experiment gave no real benefit (didn't fix the below-driver fault) so reverted
+  to the verified-good -2 baseline. Kept the BT-TX bus lock (correct arbitration,
+  separate path). Item 3's host RX-buffer hardening (NULL-drop/bounds) is correct
+  + unchanged; the panic is in the transport beneath it. Improved rx_stress.sh:
+  gdb-liveness fault detection + documented UART-drain (an undrained console adds
+  its own backpressure overflow). Re-verifying the bounded soak at -2 next.
+  Artifacts: test/coex/results/rxstress_coop2_drained_20260619.log,
+  /tmp/scanflood_cap.out (poll-thread cybt backtrace).
 - SOAK root-caused to gSPI corruption BELOW the driver + ESCALATED (5th
   attempt). gdb esf-unwind of the soak fault: panic(reason 4) on bt_tx_processor
   in cybt_get_bt_buf_index (corrupt controller ring index >= 0x1000) via the BT

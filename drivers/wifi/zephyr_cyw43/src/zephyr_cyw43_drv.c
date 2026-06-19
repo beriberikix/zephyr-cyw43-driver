@@ -42,35 +42,29 @@ zephyr_cyw43_dev_t *zephyr_cyw43_dev = &zephyr_cyw43_0;
  * not being preempted for its implicit mutual exclusion (making it preemptible
  * corrupts cyw43_ll state -> assert/abort under concurrent WiFi+BT load).
  *
- * Priority history (all cooperative, so none preempts another):
+ * It runs at coop -2 (lowest cooperative band). Priority history (all
+ * cooperative, so none preempts another):
  *  - K_PRIO_COOP(2) == coop -14 (original, HIGHEST): under a host-wake flood
  *    the poll's only yield (CYW43_EVENT_POLL_HOOK k_yield()) could not hand off
  *    to a LOWER coop thread, so events were read but never delivered ->
  *    command timeout. Predates the per-wake drain (drain loop below).
- *  - coop -2 (LOWEST band): delivered command-completes promptly but sat BELOW
- *    the BT RX workqueue (-8). Under sustained WiFi load the RX WQ, processing
- *    a notify-event burst, monopolised the CPU cooperatively and the poll could
- *    not run, so the controller's small bt2host ring OVERFLOWED before the next
- *    drain -> panic("cyw43 buffer overflow") in cybt_hci_read (~33% of
- *    moderate-load soak cycles).
- *  - coop -10 (current): one band ABOVE both BT cooperative threads (BT RX WQ
- *    -8 and BT HCI TX -9). The sole bus reader now wins the CPU the instant a
- *    consumer yields/blocks, so it drains the bt2host ring before it overflows.
- *    The per-wake drain (CYW43_POLL_DRAIN_MAX) empties pending work and then
- *    the poll BLOCKS on event_sem, which releases the CPU to the RX WQ / WiFi
- *    RX / bt_tx for delivery -- so the -14-era "read but never delivered"
- *    timeout does not recur (the poll blocks rather than spin-yielding).
+ *  - coop -10 (one band ABOVE both BT threads, tried for the soak bt2host-ring
+ *    overflow): did NOT remove the soak fault -- that residual is a gSPI
+ *    corruption BELOW this driver in the vendored cybt transport
+ *    (REFERENCE.md 2.7), which host-side priority cannot fix (it persists with
+ *    the bus lock held). With no benefit to justify moving off the
+ *    verified-good baseline, reverted to -2.
+ *  - coop -2 (current, LOWEST band): sits below the BT RX workqueue (-8). The
+ *    per-wake drain (CYW43_POLL_DRAIN_MAX) empties pending work and then the
+ *    poll BLOCKS on event_sem, releasing the CPU to the RX WQ / WiFi RX / bt_tx
+ *    so command-completes are delivered within HCI_CMD_TIMEOUT. This is the
+ *    value under which items 1-5 and the RX-flood stress (item 3) are verified
+ *    clean; it neither starves the RX consumers nor over-drives the bus.
  *
  * K_PRIO_COOP(x) == -(CONFIG_NUM_COOP_PRIORITIES - x); a SMALLER x is a higher
- * (more negative) priority. CONFIG_BT_RX_PRIO/CONFIG_BT_HCI_TX_PRIO are those
- * x indices, so MIN(...)-1 is one band above the higher-priority of the two.
+ * (more negative) priority, so NUM_COOP_PRIORITIES-2 is the lowest coop band.
  */
-#if defined(CONFIG_BT)
-#define EVENT_POLL_THREAD_PRIO \
-	(MIN(CONFIG_BT_RX_PRIO, CONFIG_BT_HCI_TX_PRIO) - 1)
-#else
 #define EVENT_POLL_THREAD_PRIO (CONFIG_NUM_COOP_PRIORITIES - 2)
-#endif
 K_KERNEL_STACK_MEMBER(zephyr_cyw43_event_poll_stack, EVENT_POLL_THREAD_STACK_SIZE);
 
 /* Max cyw43_poll() iterations to drain per poll-thread wake (bounds bus-lock
