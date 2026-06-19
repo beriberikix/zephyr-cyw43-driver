@@ -55,7 +55,7 @@ zephyr_cyw43_dev_t *zephyr_cyw43_dev = &zephyr_cyw43_0;
  * (NUM_COOP_PRIORITIES-1) yields cooperative priority -1, just above the
  * preemptible band.
  */
-#define EVENT_POLL_THREAD_PRIO (CONFIG_NUM_COOP_PRIORITIES - 1)
+#define EVENT_POLL_THREAD_PRIO (CONFIG_NUM_COOP_PRIORITIES - 2)
 K_KERNEL_STACK_MEMBER(zephyr_cyw43_event_poll_stack, EVENT_POLL_THREAD_STACK_SIZE);
 
 /* Max cyw43_poll() iterations to drain per poll-thread wake (bounds bus-lock
