@@ -125,6 +125,35 @@ either stack's firmware loads. Verified on hardware (item5 artifact):
 Added CONFIG_APP_WIFI_AUTOCONNECT (app/Kconfig, default y) so a BT-only / BT-first
 boot is buildable (-DCONFIG_APP_WIFI_AUTOCONNECT=n).
 
+## SOAK plan + environment findings (last item remaining)
+Everything except SOAK is VERIFIED. Soak harness needs (none built yet):
+1. App: a connectable BLE PERIPHERAL with a notify GATT characteristic (current
+   app only has the BT shell `bt advertise`). Add a small GATT service +
+   periodic notify; keep behind a Kconfig so the reference app stays lean.
+2. Host: a bleak central (test/coex/, to write) that connects, subscribes to the
+   notify char, and records notification latency + disconnects. Host HAS a BLE
+   adapter: hci0 = C8:95:CE:C7:B2:7F, UP RUNNING. bleak NOT installed
+   (`pip install bleak` into ../.venv).
+3. WiFi load: host CANNOT reach the Pico STA IP (host 192.168.5.215 is on a
+   different subnet than the Pico's 192.168.11.20; ping = 100% loss; no iperf3 on
+   host). So "host iperf3 against STA IP, both directions" per the spec is NOT
+   possible as written. Pico-side load is the alternative (zperf/UDP/TCP to an
+   external/iperf server, or DNS/ping bursts) — exercises the shared bus the same
+   way. NOTE: `net ping 192.168.11.1` (gateway) TX works but gets no ICMP reply;
+   need a reachable load target.
+4. Cold boots: SWD `reset run` re-powers the CYW43 + reloads WiFi/BT firmware
+   (= effective cold boot of the wireless subsystem; proven in cold_boot_btaddr).
+   True board power-cycle needs hardware the loop lacks.
+5. PASS gate: zero CYW43 lockups, zero Zephyr faults/asserts, zero unexpected BLE
+   disconnects, WiFi throughput within threshold, BLE notify latency under bound,
+   over SOAK_HOURS x COLD_BOOTS. Archive logs under test/coex/results/.
+The item-4 fix already makes the realistic coex (advertise + WiFi load + HCI
+cmds) survive; the soak is the long-duration proof.
+
+OPEN DECISIONS for the operator (asked at end of this run): WiFi-load topology
+(Pico-side vs put host on AP LAN vs provide an iperf server) and soak
+scope/duration + whether SWD-reset counts as a cold boot.
+
 ## Build matrix (keep green)
 - Combined WiFi+BT (app/prj.conf): GREEN, hardware-verified (M0.1, item 1).
 - WiFi-only (`-DCONFIG_BT=n`): GREEN (links; bt_hci_drv.c excluded via
