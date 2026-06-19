@@ -32,7 +32,30 @@ static zephyr_cyw43_dev_t zephyr_cyw43_0; /* static instance */
 zephyr_cyw43_dev_t *zephyr_cyw43_dev = &zephyr_cyw43_0;
 
 #define EVENT_POLL_THREAD_STACK_SIZE 1024
-#define EVENT_POLL_THREAD_PRIO 2
+/*
+ * Shared-bus poll thread priority.
+ *
+ * This thread is the sole reader of the gSPI bus; it reads HCI events and WiFi
+ * packets and hands them to the Bluetooth host RX workqueue (cooperative prio
+ * CONFIG_BT_RX_PRIO, default -8) and the WiFi RX queue. It MUST stay
+ * cooperative: the georgerobotics cyw43_ll code relies on the poll thread not
+ * being preempted for its implicit mutual exclusion (making it preemptible
+ * corrupts cyw43_ll state -> assert/abort under concurrent WiFi+BT load).
+ *
+ * The original K_PRIO_COOP(2) == -14 was the *highest* cooperative priority, so
+ * under a sustained host-wake flood the poll thread's k_yield() (the
+ * CYW43_EVENT_POLL_HOOK) never handed off to the lower-priority BT RX
+ * workqueue: events were read off the bus but never delivered to the host, and
+ * bt_hci_cmd_send_sync() timed out ("Controller unresponsive"). Running the
+ * poll thread at the LOWEST cooperative priority keeps the no-preemption
+ * guarantee while letting k_yield() release the CPU to every consumer
+ * (BT RX WQ, WiFi RX, bt_tx) so command-completes are delivered promptly.
+ *
+ * K_PRIO_COOP(n) == -CONFIG_NUM_COOP_PRIORITIES + n, so the highest valid n
+ * (NUM_COOP_PRIORITIES-1) yields cooperative priority -1, just above the
+ * preemptible band.
+ */
+#define EVENT_POLL_THREAD_PRIO (CONFIG_NUM_COOP_PRIORITIES - 1)
 K_KERNEL_STACK_MEMBER(zephyr_cyw43_event_poll_stack, EVENT_POLL_THREAD_STACK_SIZE);
 
 struct k_thread event_thread;

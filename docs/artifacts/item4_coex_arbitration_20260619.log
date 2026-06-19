@@ -1,0 +1,14 @@
+=== item 4: bus-arbitration fix verification 2026-06-19T15:00:03Z ===
+[fix: cyw43 poll thread K_PRIO_COOP(2)=-14 -> K_PRIO_COOP(NUM_COOP-1)=-1 (lowest coop)]
+[Before: 'bt scan on' + 'net ping' faulted (Controller unresponsive) on burst 1.]
+
+--- realistic coex: BLE advertise + WiFi ping load + HCI cmds, 4 rounds ---
+round 1: advertise off=[Advertising stopped] on=[Advertising started] Uptime: 241562
+round 2: advertise off=[Advertising stopped] on=[Advertising started] Uptime: 265272
+round 3: advertise off=[Advertising stopped] on=[Advertising started] Uptime: 288976
+round 4: advertise off=[Advertising stopped] on=[Advertising started] Uptime: 312671
+--- final wifi status ---
+State: COMPLETED
+SSID: 819 Paramount
+BSSID: 84:70:D7:29:70:70
+RSSI: -55
