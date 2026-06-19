@@ -1,0 +1,269 @@
+=== RX event-flood stress 2026-06-19T21:36:17Z dur=150s ===
+bt init
+[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:21.057,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:21.146,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[00:00:21.198,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:21.198,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:21.198,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:21.198,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt scan on
+Bluetooth active scan enabled
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -96  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -97  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -96  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -81  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -91 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: F9:3A:E3:E6:6A:10 (random), AD evt type 0, RSSI -61 N014B C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -69 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: E5:D5:46:A4:75:D6 (random), AD evt type 3, RSSI -99  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -91 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -82  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -89  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -66  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 66:E8:1B:08:C7:FD (random), AD evt type 0, RSSI -98  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:[8D[J[00:00:26.733,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:26.919,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:27.399,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:27.618,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:27.649,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:27.678,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -69 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -81  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -98  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -81 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -98  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -84  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -85  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -99  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -82 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -91 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -79 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -94  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -79 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[00:00:27.814,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:27.879,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:27.923,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:27.985,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:28.367,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:28.539,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:28.645,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:28.704,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -60  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -96  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: E5:D5:46:A4:75:D6 (random), AD evt type 3, RSSI -85  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -69 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 66:E8:1B:08:C7:FD (random), AD evt type 0, RSSI -83  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: DA:EC:A7:DF:7F:E2 (random), AD evt type 3, RSSI -74  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -101  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -94  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: F9:3A:E3:E6:6A:10 (random), AD evt type 0, RSSI -61 N014B C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -95  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -79  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -85  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -75  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -81  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -66 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -68 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -79 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[00:00:29.207,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:29.313,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:29.369,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:29.433,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:29.491,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:29.548,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:29.684,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:29.980,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:30.048,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -66 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -85  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -79  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -98  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -74  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -92  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 5A:8C:66:54:FE:36 (random), AD evt type 0, RSSI -91  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -66 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -96  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -91 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -66 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[00:00:30.227,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:30.317,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:30.685,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:30.826,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:30.895,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:30.997,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:31.067,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[J[DEVICE]: DA:EC:A7:DF:7F:E2 (random), AD evt type 3, RSSI -88  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -78  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -82 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -77 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -66 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 66:E8:1B:08:C7:FD (random), AD evt type 0, RSSI -85  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -100  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 6D:B6:F3:A8:64:46 (random), AD evt type 0, RSSI -93  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -88  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 66:E8:1B:08:C7:FD (random), AD evt type 0, RSSI -84  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -85  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -74  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -69 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: F9:3A:E3:E6:6A:10 (random), AD evt type 0, RSSI -74 N014B C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -83  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 6D:B6:F3:A8:64:46 (random), AD evt type 0, RSSI -89  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -67 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -69 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -60  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[00:00:31.538,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:31.598,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:31.904,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:32.064,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:32.132,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:32.178,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:32.318,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:32.487,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:32.556,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -84  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4F:73:B4:C9:87:5D (random), AD evt type 0, RSSI -90  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -79  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:CF:C4:DA:2D:23 (random), AD evt type 0, RSSI -93 N02Y0 C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -81  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -78  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -79 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -90  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -82 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -76 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -90  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 66:E8:1B:08:C7:FD (random), AD evt type 0, RSSI -91  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -84  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 66:E8:1B:08:C7:FD (random), AD evt type 0, RSSI -92  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -96  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: DC:9F:04:D4:D4:B5 (random), AD evt type 0, RSSI -91  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -79 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 6D:B6:F3:A8:64:46 (random), AD evt type 0, RSSI -92  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -83  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -90 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[00:00:32.798,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:32.979,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:33.464,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:33.615,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:33.654,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:33.698,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:33.756,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:33.841,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -82 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 66:E8:1B:08:C7:FD (random), AD evt type 0, RSSI -96  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -84  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -89  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -93  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -70 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -90  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -82 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -70 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -69 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -97  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -95  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -85  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -82 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -91 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[00:00:33.923,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:33.982,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:34.039,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:34.365,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:34.480,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:34.604,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:34.847,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:34.907,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -79  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -69 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -85  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:CF:C4:DA:2D:23 (random), AD evt type 0, RSSI -90 N02Y0 C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -82 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -98  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[00:00:34.960,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:35.010,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:35.079,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:35.128,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:35.389,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:35.477,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:35.486,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:35.537,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:35.597,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:35.742,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -81  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -75  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -79 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -69 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -82 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 5A:8C:66:54:FE:36 (random), AD evt type 0, RSSI -102  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -87  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 66:E8:1B:08:C7:FD (random), AD evt type 0, RSSI -83  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 66:E8:1B:08:C7:FD (random), AD evt type 0, RSSI -89  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -60  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -78 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -80 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -69 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: EC:AD:24:89:5A:A0 (random), AD evt type 3, RSSI -101  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[00:00:35.906,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:35.932,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:36.042,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:36.107,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:36.172,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[00:00:36.815,000] [1;33m<wrn> bt_driver: bogus cyw43 RX length 0[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -79  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -78  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -86  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -82 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 49:A1:39:56:91:E1 (random), AD evt type 0, RSSI -84  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -79 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -87  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -77 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -65 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 79:0C:EB:1B:18:1F (random), AD evt type 3, RSSI -87  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 66:E8:1B:08:C7:FD (random), AD evt type 0, RSSI -87  C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 3D:1A:FE:D9:CD:58 (random), AD evt type 3, RSSI -84  C:0 S:0 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: 4B:B3:CF:42:43:08 (random), AD evt type 2, RSSI -62  C:0 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m[8D[J[DEVICE]: CF:4C:9E:8A:91:6D (random), AD evt type 0, RSSI -92 Olivia’s Hatch C:1 S:1 D:0 SR:0 E:0 Prim: LE 1M, Secn: No packets, Interval: 0x0000 (0 us), SID: 0xff
+[1;32muart:~$ [m>> [t=40s] gdb-liveness=ALIVE
+>> [t=70s] gdb-liveness=FAULT
+>> DEVICE FAULTED (arch_system_halt) at t=70s
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+=== SUMMARY ===
+advertising-report lines captured: 155
+panic/assert hits in log: 0
+RESULT: FAIL
