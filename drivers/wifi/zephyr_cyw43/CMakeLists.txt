@@ -19,23 +19,26 @@ if(CONFIG_WIFI_ZEPHYR_CYW43)
       src/cyw43-driver/src/cyw43_ll.c
       src/cyw43-driver/src/cyw43_ctrl.c
     )
+
+    # gSPI bus backend for the georgerobotics stack. It binds the
+    # infineon,cyw43 DT node (absent in WHD mode, where the upstream AIROC
+    # driver owns the PIO-SPI), so it builds only under this backend.
+    if(CONFIG_USE_PICOWI_PIOSPI)
+      zephyr_library_sources(
+        src/cyw43_bus_picowi_pio_spi.c
+        src/picowi_pio/picowi_pio.c
+        src/picowi_pio/picowi_pico.c
+      )
+    else()
+      zephyr_library_sources(
+        src/cyw43_bus_pio_spi.c
+      )
+    endif()
   elseif(CONFIG_CYW43_TRANSPORT_WHD)
-    # WHD WiFi glue + SEAM-1 BT primitive shims land here (W1+).
+    # WHD WiFi is provided by the upstream AIROC driver (CONFIG_WIFI_AIROC)
+    # over the board's stock infineon,airoc-wifi node; this module's only WHD
+    # sources are the SEAM-1 BT primitive shims (W3+).
     add_subdirectory(src/whd)
-  endif()
-
-  # The default now is to use Zephyr's PIO-SPI (the 2nd one)  
-  if(CONFIG_USE_PICOWI_PIOSPI)
-    zephyr_library_sources(
-      src/cyw43_bus_picowi_pio_spi.c
-      src/picowi_pio/picowi_pio.c
-      src/picowi_pio/picowi_pico.c
-    )
-
-  else()
-    zephyr_library_sources(
-      src/cyw43_bus_pio_spi.c
-    )
   endif()
 
   # BT HCI transport over the shared gSPI bus. Only the georgerobotics backend

@@ -1,0 +1,67 @@
+/*
+ * WHD-port WiFi topology — layered ON TOP of the auto-applied board overlay
+ * (app/boards/rpi_pico2_rp2350a_m33_w.overlay, which builds the georgerobotics
+ * infineon,cyw43 node). Pass for WHD builds via:
+ *   -DEXTRA_DTC_OVERLAY_FILE="$PWD/test/coex/whd.overlay"
+ *
+ * Devicetree overlays are preprocessed before Kconfig, so the topology cannot
+ * be selected by CONFIG_*; we instead re-delete pio0_spi0 and restore the
+ * board's stock infineon,airoc-wifi node so the upstream WIFI_AIROC driver
+ * (auto-enabled by DT_HAS_INFINEON_AIROC_WIFI) drives WHD over the PIO-SPI.
+ * Mirrors the stock node in
+ *   zephyr/boards/raspberrypi/rpi_pico2/rpi_pico2_rp2350a_m33_w.dts
+ * CS=GP25, CLK=GP29, SIO/host-wake=GP24 (shared, half-duplex), REG_ON=GP23.
+ */
+
+/* W1 is WiFi-only; the georgerobotics board overlay's bt_hci chosen points at
+ * a node we are about to delete — drop it to avoid a dangling phandle. */
+/ {
+	chosen {
+		/delete-property/ zephyr,bt_hci;
+	};
+};
+
+/delete-node/ &pio0_spi0;
+
+&pio0 {
+	status = "okay";
+
+	pio0_spi0: pio0_spi0 {
+		compatible = "raspberrypi,pico-spi-pio";
+		clocks = <&clocks RPI_PICO_CLKID_CLK_SYS>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		cs-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
+		clk-gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+		sio-gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+		pinctrl-0 = <&pio0_spi0_default>;
+		pinctrl-names = "default";
+		status = "okay";
+
+		airoc_wifi: airoc-wifi@0 {
+			compatible = "infineon,airoc-wifi";
+			reg = <0x0>;
+
+			wifi-reg-on-gpios = <&gpio0 23 GPIO_ACTIVE_HIGH>;
+			bus-select-gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+			wifi-host-wake-gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+
+			spi-max-frequency = <10000000>;
+			spi-half-duplex;
+			spi-data-irq-shared;
+
+			pinctrl-0 = <&airoc_wifi_default>;
+			pinctrl-1 = <&airoc_wifi_host_wake>;
+			pinctrl-names = "default", "host_wake";
+
+			status = "okay";
+
+			cyw43_gpio: gpio {
+				compatible = "infineon,cyw43-gpio";
+				gpio-controller;
+				#gpio-cells = <2>;
+				ngpios = <3>;
+			};
+		};
+	};
+};

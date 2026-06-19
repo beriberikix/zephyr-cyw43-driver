@@ -67,7 +67,7 @@ choice keeps the proven stack as default/fallback; the whole matrix stays green 
 | # | Milestone | Status | Artifact |
 |---|-----------|--------|----------|
 | W0 | Transport switch (Kconfig choice + guarded CMake WHD branch) + §1 EULA-blob lift + this section + blob fetch; build matrix green + georgerobotics boot smoke | VERIFIED | docs/artifacts/w0_kconfig_matrix_20260619.log — georgerobotics {wifi+bt, wifi-only} + WHD wifi-only all link green; georgerobotics boots to idle (gdb, not arch_system_halt); 43439A0.bin (249KB)+clm fetched. WHD+BT deferred to W3 (BT host needs the HCI device → `undefined reference __device_dts_ord_82`). |
-| W1 | WHD WiFi-only scan (whd_init/attach/wifi_on/scan over PIO-SPI Zephyr device; resolves R1) | TODO | (pending) w1_whd_scan |
+| W1 | WHD WiFi-only scan (whd_init/attach/wifi_on/scan over PIO-SPI Zephyr device; resolves R1) | VERIFIED | docs/artifacts/w1_whd_scan_20260619.log — upstream AIROC driver scanned real APs (jberi_hil, funrun, 819 Paramount…) over the RP2350 PIO-SPI, "Scan request done". R1 RESOLVED: WHD's whd_bus_spi_transfer works via spi_transceive_dt (SPI_HALF_DUPLEX, spi-data-irq-shared GP24). Matrix green: WHD 13.72% / geo wifi+bt 14.16% / geo wifi-only 12.14%. |
 | W2 | WHD associate + DHCP via Zephyr net L2 (mirror airoc_wifi.c) | TODO | (pending) w2_whd_assoc_dhcp |
 | W3 | BT-only bring-up over WHD-arbitrated bus; SEAM-1 primitives; BD_ADDR=MAC+1 | TODO | (pending) w3_whd_bt_bringup, w3_bdaddr_10boots |
 | W4 | Coexistence parity — unchanged soak.sh/rx_stress.sh/ble_central.py; BT survives wifi disconnect | TODO | (pending) w4_whd_coex_soak |
@@ -75,11 +75,26 @@ choice keeps the proven stack as default/fallback; the whole matrix stays green 
 | W6 | §2.7 fix: BT ring-index read via WHD F1-overflow-aware path (durable hal_rpi_pico patch); full 2 h soak zero faults | TODO | (pending) w6_soak_2h_clean |
 | W7 | (optional) flip default to CYW43_TRANSPORT_WHD; matrix green | TODO | (pending) w7_default_flip |
 
+Architecture decision (W1): the WHD WiFi path REUSES the upstream Zephyr AIROC
+driver (zephyr/drivers/wifi/infineon, CONFIG_WIFI_AIROC) over the board's stock
+infineon,airoc-wifi node — we do NOT write a custom WiFi driver. The board DTS
+already ships that node with correct half-duplex/shared-IRQ pinctrl; WIFI_AIROC
+auto-enables from DT_HAS_INFINEON_AIROC_WIFI. This module (CYW43_TRANSPORT_WHD)
+contributes no WiFi net device (CMake-gated). src/whd is reserved for the SEAM-1
+BT shims (W3+).
+
+DT GOTCHA (W1): devicetree overlays are preprocessed BEFORE Kconfig, so CONFIG_*
+is NOT visible in .overlay files — a topology cannot be `#if CONFIG_`-gated.
+Instead the georgerobotics topology is the auto-applied board overlay and the
+WHD build LAYERS test/coex/whd.overlay on top (re-deletes pio0_spi0, restores
+the stock airoc node, drops the dangling zephyr,bt_hci chosen).
+
 WHD-port build matrix (all must stay green every milestone):
 ```
-# WHD mode (wifi+bt)
+# WHD mode (W1: wifi-only; from W3: +BT)
 west build -p always -b rpi_pico2/rp2350a/m33/w -d build_whd app \
-  -- -DEXTRA_CONF_FILE="$PWD/app/local.conf" -DCONFIG_CYW43_TRANSPORT_WHD=y
+  -- -DEXTRA_CONF_FILE="$PWD/app/local.conf;$PWD/test/coex/whd.conf" \
+     -DEXTRA_DTC_OVERLAY_FILE="$PWD/test/coex/whd.overlay"
 # regression: proven georgerobotics stack (wifi+bt)
 west build -p always -b rpi_pico2/rp2350a/m33/w -d build_pico2 app \
   -- -DEXTRA_CONF_FILE="$PWD/app/local.conf"
