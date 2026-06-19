@@ -72,63 +72,83 @@ static int zephyr_cyw43_bt_hci_close(const struct device *dev)
 	return 0;
 }
 
-void cyw43_bluetooth_hci_process(void) {
-	
-	struct net_buf *buf=NULL;
+void cyw43_bluetooth_hci_process(void)
+{
+	struct net_buf *buf = NULL;
 	bool discardable = false;
 	k_timeout_t timeout = K_FOREVER;
 	struct bt_hci_acl_hdr acl_hdr = { .len = 0 };
-	uint32_t cyw43_len;
-	uint32_t len;
+	uint32_t cyw43_len = 0;
+	uint32_t pkt_len;	/* bytes available from rxmsg[0]: type + payload */
+	uint32_t avail;		/* HCI payload bytes available after the type byte */
+	uint32_t len;		/* parsed HCI packet length (header + payload) */
 	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
 	uint8_t packet_type;
 	uint8_t *rxmsg;
-	
-        LOG_DBG("Entering cyw43_bluetooth_hci_process()");
-	
-	cyw43_bluetooth_hci_read(&cyw43_rxbuf[0], MAX_BT_MSG_SIZE, &cyw43_len);
+	int ret;
+
+	LOG_DBG("Entering cyw43_bluetooth_hci_process()");
+
+	/* Robustness: the read can fail (bus error / controller not up). On
+	 * failure *len is not meaningful, so do not parse stale buffer data. */
+	ret = cyw43_bluetooth_hci_read(&cyw43_rxbuf[0], MAX_BT_MSG_SIZE, &cyw43_len);
+	if (ret) {
+		LOG_ERR("cyw43_bluetooth_hci_read failed (ret %d)", ret);
+		return;
+	}
+
+	/* cyw43_len counts the full 4-byte cyw43 header; the last header byte
+	 * (index CYW43_PACKET_HEADER_SIZE-1) is the H4 packet type, followed by
+	 * the HCI packet. Need at least that type byte, and it must fit the RX
+	 * buffer (guards an underflow in the pkt_len computation below). */
+	if (cyw43_len < CYW43_PACKET_HEADER_SIZE || cyw43_len > sizeof(cyw43_rxbuf)) {
+		LOG_WRN("bogus cyw43 RX length %u", cyw43_len);
+		return;
+	}
 
 	rxmsg = &cyw43_rxbuf[CYW43_PACKET_HEADER_SIZE - 1];
 	packet_type = rxmsg[PACKET_TYPE];
-	len = cyw43_len - (CYW43_PACKET_HEADER_SIZE - 1);
-		
-	LOG_HEXDUMP_DBG(rxmsg, len, "HCI RX data:");
-	LOG_DBG("cyw43_bluetooth_hci_process(), len = %d", len);
-	LOG_DBG("cyw43_bluetooth_hci_process(): packet_type = %d", packet_type);
-	
+	pkt_len = cyw43_len - (CYW43_PACKET_HEADER_SIZE - 1);
+	avail = pkt_len - PACKET_TYPE_SIZE;
+
+	LOG_HEXDUMP_DBG(rxmsg, pkt_len, "HCI RX data:");
+	LOG_DBG("cyw43 RX: type=%u pkt_len=%u", packet_type, pkt_len);
+
 	switch (packet_type) {
 	case BT_HCI_H4_EVT:
+		if (avail < sizeof(struct bt_hci_evt_hdr)) {
+			LOG_WRN("EVT too short: %u", avail);
+			return;
+		}
 		if (rxmsg[EVT_HEADER_EVENT] == BT_HCI_EVT_LE_META_EVENT &&
 		    (rxmsg[EVT_LE_META_SUBEVENT] == BT_HCI_EVT_LE_ADVERTISING_REPORT)) {
 			discardable = true;
 			timeout = K_NO_WAIT;
 		}
-		buf = bt_buf_get_evt(rxmsg[EVT_HEADER_EVENT],
-				     discardable, timeout);
+		buf = bt_buf_get_evt(rxmsg[EVT_HEADER_EVENT], discardable, timeout);
 		len = sizeof(struct bt_hci_evt_hdr) + rxmsg[EVT_HEADER_SIZE];
-		LOG_DBG("EVT len = %d", len);
 		break;
 	case BT_HCI_H4_ACL:
+		if (avail < sizeof(struct bt_hci_acl_hdr)) {
+			LOG_WRN("ACL too short: %u", avail);
+			return;
+		}
 		buf = bt_buf_get_rx(BT_BUF_ACL_IN, timeout);
 		memcpy(&acl_hdr, &rxmsg[1], sizeof(acl_hdr));
 		len = sizeof(struct bt_hci_acl_hdr) + sys_le16_to_cpu(acl_hdr.len);
-		LOG_DBG("ACL len = %d", len);
-		if (buf != NULL && len > net_buf_tailroom(buf)) {
-			LOG_ERR("ACL too long: %d", len);
-			net_buf_unref(buf);
-			return;
-		}
-
 		break;
 #if defined(CONFIG_BT_ISO)
 	case BT_HCI_H4_ISO: {
 		struct bt_hci_iso_hdr iso_hdr;
 
+		if (avail < sizeof(struct bt_hci_iso_hdr)) {
+			LOG_WRN("ISO too short: %u", avail);
+			return;
+		}
 		buf = bt_buf_get_rx(BT_BUF_ISO_IN, timeout);
 		memcpy(&iso_hdr, &rxmsg[1], sizeof(iso_hdr));
 		len = sizeof(struct bt_hci_iso_hdr) +
 		      bt_iso_hdr_len(sys_le16_to_cpu(iso_hdr.len));
-		LOG_DBG("ISO len = %d", len);
 		break;
 	}
 #endif /* CONFIG_BT_ISO */
@@ -142,25 +162,51 @@ void cyw43_bluetooth_hci_process(void) {
 		 * SCO).
 		 */
 		LOG_WRN("dropping unsupported SCO packet (cyw43_len %u)", cyw43_len);
-		buf = NULL;
-		len = 0;
-		break;
+		return;
 	default:
-		buf = NULL;
-		len = 0;
-		break;
+		LOG_WRN("unknown H4 RX packet type 0x%02x", packet_type);
+		return;
 	}
 
-	if (len == 0) {
-		LOG_WRN("Unknown BT buf type %d", rxmsg[PACKET_TYPE]);
+	/*
+	 * Backpressure / exhaustion policy: bt_buf_get_evt()/bt_buf_get_rx() can
+	 * return NULL when the pool is exhausted, and bt_buf_get_evt() returns
+	 * NULL by design for a discardable advertising report under K_NO_WAIT.
+	 * Drop the packet instead of dereferencing NULL. (For non-discardable
+	 * traffic the timeout is K_FOREVER, so NULL here means a genuine
+	 * allocation failure worth flagging.)
+	 */
+	if (buf == NULL) {
+		if (discardable) {
+			LOG_DBG("dropped discardable advertising report (no buf)");
+		} else {
+			LOG_WRN("no RX buf for type 0x%02x; dropping", packet_type);
+		}
+		return;
 	}
-	else {
-		net_buf_add_mem(buf, &rxmsg[1], len);
-		bt_hci_recv(dev, buf);
+
+	/*
+	 * Length bounds: the HCI length field must be consistent with the bytes
+	 * we actually received and must fit the destination buffer, or we would
+	 * over-read cyw43_rxbuf / overflow the net_buf.
+	 */
+	if (len > avail) {
+		LOG_ERR("HCI len %u exceeds received payload %u (type 0x%02x)",
+			len, avail, packet_type);
+		net_buf_unref(buf);
+		return;
 	}
-	LOG_DBG("Leaving cyw43_bluetooth_hci_process()\n");
-	
-	return;
+	if (len > net_buf_tailroom(buf)) {
+		LOG_ERR("HCI len %u exceeds buf tailroom %zu (type 0x%02x)",
+			len, net_buf_tailroom(buf), packet_type);
+		net_buf_unref(buf);
+		return;
+	}
+
+	net_buf_add_mem(buf, &rxmsg[1], len);
+	bt_hci_recv(dev, buf);
+
+	LOG_DBG("Leaving cyw43_bluetooth_hci_process()");
 }
 
 static int zephyr_cyw43_bt_hci_send(const struct device *dev, struct net_buf *buf)
