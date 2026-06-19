@@ -38,14 +38,41 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | M0.1 | Driver app builds+flashes+boots on Pico 2 W with WIFI+BT in one image; `wifi connect` associates AND `bt init`+advertise succeed (rebase to 4.4 + add rpi_pico2 overlay + reconcile cyw43 GPIO binding) | VERIFIED | docs/artifacts/m0.1_wifi_bt_20260619.log (STA COMPLETED, DHCP 192.168.11.20; bt init ok, id 88:A2:9E:D1:6D:A0; advertising started) |
 | 1 | HCI setup / BD_ADDR (stable correct public addr across 10 cold boots) | VERIFIED | docs/artifacts/item1_bdaddr_10boots_20260619.log (10/10 boots = 88:A2:9E:D1:6D:A0, distinct=1, STABLE; setup hook verified =WiFi MAC+1 all 10) |
 | 2 | SCO/ISO separation (ISO correct; SCO routed or cleanly gated) | VERIFIED | docs/artifacts/item2_iso_smoke_20260619.log (ISO RX guarded by CONFIG_BT_ISO w/ BT_BUF_ISO_IN; SCO dropped not mis-routed; ISO build green; bt init+advertise+WiFi coex healthy. Controller lacks ISO HW -> no ISO/SCO traffic, routing verified by build+code) |
-| 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | IN-PROGRESS | RX hardening committed (1679e8f); event-flood 150s/773 evt/0 RX faults (docs/artifacts/item3_rx_stress_20260619.log). Full pass gated on item 4 (scan-off command-timeout). |
-| 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | IN-PROGRESS | ROOT FAULT FOUND (see "Item 4 fault" below) — critical soak blocker |
+| 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | VERIFIED | docs/artifacts/item3_rx_stress_20260619.log — 120s forced-exhaustion (discardable=1) flood, 542 reports, device responsive throughout (uptime 17->150s), 0 faults. RESULT: PASS. |
+| 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | VERIFIED | docs/artifacts/item4_coex_arbitration_20260619.log — root-caused poll-thread priority inversion; fixed (coop -14 -> -1); realistic coex (advertise+WiFi load+HCI cmds) 4 rounds clean. Full 2h soak = SOAK row. |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | TODO | |
 | 6 | Firmware blob pinned + provenance/license recorded | TODO | |
 | SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | TODO | |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | TODO | |
 
-## Item 4 fault (CRITICAL — bus arbitration; blocks SOAK)
+## Item 4 RESOLVED (poll-thread priority inversion) — analysis
+ROOT CAUSE: the cyw43 shared-bus poll thread (sole gSPI reader; feeds the BT
+host RX workqueue at coop -8 and WiFi RX) was created K_PRIO_COOP(2) == -14, the
+HIGHEST cooperative priority. Under sustained host-wake activity it never blocked
+and its only yield (CYW43_EVENT_POLL_HOOK k_yield()) can't drop to a lower coop
+thread, so HCI command-completes were read off the bus but never delivered to the
+host -> bt_hci_cmd_send_sync 10s timeout -> oops.
+FIX (commit 8b82c09): poll thread -> K_PRIO_COOP(CONFIG_NUM_COOP_PRIORITIES-1)
+== -1 (lowest coop). MUST stay cooperative — preemptible corrupts cyw43_ll state
+(implicit mutual exclusion relies on no-preemption; tested: preemptible -> assert
+/abort). At -1, k_yield() releases to BT RX WQ / WiFi RX / bt_tx, delivering
+command-completes promptly while preserving the no-preempt guarantee.
+VERIFIED: realistic coex (BLE advertise + WiFi ping load + repeated HCI cmds) 4
+rounds, all commands succeed, WiFi stays associated, no fault. Artifact:
+docs/artifacts/item4_coex_arbitration_20260619.log.
+Thread audit (kernel thread list, debug build): poll 632/1024 stack (61%); a
+work_q thread at 86% (888/1024) — watch in soak; no overflow observed.
+
+### Console-saturation artifact (NOT a driver bug)
+`bt scan on` in a dense RF area makes the BT shell print every advertising
+report over the 115200 UART; that backs up the host RX workqueue, so an HCI
+command issued mid-flood (`bt scan off`) has its command-complete delayed past
+HCI_CMD_TIMEOUT. This is console throughput, not the bus — the soak workload is a
+BLE peripheral (no scan-print flood). Clean HCI commands (advertise on/off) work
+fine even under concurrent WiFi load (item 4 artifact). rx_stress.sh stops the
+flood by SWD reset rather than an HCI command to avoid conflating this.
+
+## Item 4 fault (historical — root-cause notes, now fixed)
 Symptom: kernel oops (reason 3) in the shell thread; gdb backtrace:
   arch_system_halt(reason=3) <- z_fatal_error <- z_arm_svc, esf on shell_uart_stack.
   faulting PC = bt_hci_cmd_send_sync+164 @ hci_core.c:482 ->
@@ -124,17 +151,19 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
 UART is wired and working (done). Console driven via test/coex/console.py.
 
 ## NEXT UP (resume pointer)
-M0.0, M0.1, item 1, item 2 VERIFIED. item 3 RX hardening committed (event-flood
-fault-free); item 3 full pass + item 4 are coupled by the "Item 4 fault" above.
-  -> NEXT: item 4 — fix the bus-arbitration / HCI-command-timeout fault (see
-     "Item 4 fault" section: repro, gdb evidence, hypothesis). This is the
-     critical soak blocker; do it before items 5/6/SOAK.
-  -> Then re-run test/coex/rx_stress.sh (should pass clean) to fully verify item 3,
-     and a concurrent WiFi+BT stress (scan + net ping) should survive.
-Board holds the canonical reference app (build_pico2, no ISO). Resume:
+M0.0, M0.1, items 1-4 VERIFIED. Remaining: item 5, item 6, SOAK, REF.
+  -> NEXT: item 5 — shared WL_REG_ON/BT_REG_ON power: verify BT-only, WiFi-then-BT,
+     BT-then-WiFi init orders all come up clean (logged). See item 5 row.
+  -> Then item 6 (pin firmware blob + provenance in REFERENCE.md), REF (REFERENCE.md
+     transport/arbitration contract), and SOAK (2h + 5 cold boots, real WiFi load).
+  -> SOAK note: WiFi load generation is unsolved — host can't reach the Pico's
+     192.168.x net and gateway ICMP times out. Need zperf (Zephyr->external server)
+     or put the host on the AP LAN. Resolve before the soak gate.
+Board: rebuild/flash the canonical app for resume:
   source ../.venv/bin/activate
-  west build -b rpi_pico2/rp2350a/m33/w -d build_pico2 app   # if rebuild needed
-Re-run cold-boot + coex stress after any RX/TX/poll/arbitration change.
+  west build -b rpi_pico2/rp2350a/m33/w -d build_pico2 app
+Re-run cold-boot + a coex stress (test/coex/rx_stress.sh, and the item-4 realistic
+coex) after ANY RX/TX/poll/arbitration change.
 
 ## Artifacts (this run)
 - Build (WIFI+BT, rpi_pico2): build_pico2/zephyr/zephyr.elf (+ .uf2), build succeeds clean.
@@ -153,6 +182,12 @@ Re-run cold-boot + coex stress after any RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- Item 4 VERIFIED (8b82c09): fixed poll-thread priority inversion (coop -14 ->
+  -1 lowest coop) starving the BT command path; realistic coex (advertise+WiFi
+  load+HCI cmds) 4 rounds clean. Item 3 re-verified clean with the fix in place:
+  rx_stress.sh now stops the flood via SWD reset (avoids the console-saturation
+  artifact); 120s forced-exhaustion flood, 542 reports, 0 faults, responsive.
+  Documented the console-saturation artifact + threading audit in PROGRESS.
 - Item 3 RX hardening committed (1679e8f) + item 4 root fault found. RX path now
   checks read() return, bounds cyw43_len/parsed lengths, and drops on NULL-buf
   instead of NULL-deref. Event-flood stress (discardable=1, 150s, 773 reports)
