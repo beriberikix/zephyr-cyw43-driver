@@ -14,7 +14,10 @@ menuconfig WIFI_ZEPHYR_CYW43
         select PICOSDK_USE_UART
 	select SPI
 	select SPI_RPI_PICO_PIO
-	
+	# The CYW43 BT HCI driver implements the vendor setup() hook, which
+	# verifies the controller's public BD_ADDR == WiFi MAC + 1.
+	select BT_HCI_SETUP if BT
+
 #if WIFI_ZEPHYR_CYW43
 config WIFI_ZEPHYR_CYW43_SHELL
 	bool "CYW43 shell"

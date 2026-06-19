@@ -36,7 +36,7 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 |---|------|--------|----------|
 | M0.0 | Reliable single-command flash + a console the loop can drive (shell round-trip); image confirmed running via gdb | VERIFIED | docs/artifacts/m0.0_console_20260619.log (flash Verified OK + gdb idle + `kernel version`->`Zephyr version 4.4.99`) |
 | M0.1 | Driver app builds+flashes+boots on Pico 2 W with WIFI+BT in one image; `wifi connect` associates AND `bt init`+advertise succeed (rebase to 4.4 + add rpi_pico2 overlay + reconcile cyw43 GPIO binding) | VERIFIED | docs/artifacts/m0.1_wifi_bt_20260619.log (STA COMPLETED, DHCP 192.168.11.20; bt init ok, id 88:A2:9E:D1:6D:A0; advertising started) |
-| 1 | HCI setup / BD_ADDR (stable correct public addr across 10 cold boots) | TODO | |
+| 1 | HCI setup / BD_ADDR (stable correct public addr across 10 cold boots) | VERIFIED | docs/artifacts/item1_bdaddr_10boots_20260619.log (10/10 boots = 88:A2:9E:D1:6D:A0, distinct=1, STABLE; setup hook verified =WiFi MAC+1 all 10) |
 | 2 | SCO/ISO separation (ISO correct; SCO routed or cleanly gated) | TODO | |
 | 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | TODO | |
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | TODO | |
@@ -100,6 +100,13 @@ The app is already flashed (build_pico2/zephyr/zephyr.elf) and boots healthy; no
 - gdb run-confirm of WIFI+BT app: idles in arch_cpu_idle (healthy). Logged to PROGRESS.
 
 ## Changelog (newest first)
+- Item 1 (HCI setup / BD_ADDR) VERIFIED. Implemented CONFIG_BT_HCI_SETUP
+  (select BT_HCI_SETUP if BT in the module Kconfig): the setup() hook reads the
+  controller BD_ADDR via HCI Read_BD_ADDR and verifies it equals WiFi MAC + 1
+  (computed from cyw43_state.mac), erroring on a zero/broadcast address. 10-cold-boot
+  harness test/coex/cold_boot_btaddr.sh: all 10 boots report 88:A2:9E:D1:6D:A0
+  (stable), hook logs "verified (= WiFi MAC + 1)" each boot.
+  Artifact: docs/artifacts/item1_bdaddr_10boots_20260619.log.
 - M0.0 + M0.1 VERIFIED on hardware. UART wired by operator; console round-trip works.
   WiFi STA associates to "819 Paramount" (DHCP 192.168.11.20); `bt init` ok (public
   addr 88:A2:9E:D1:6D:A0 = WiFi MAC 88:A2:9E:D1:6D:9F + 1, manuf 0x0131, HCI 5.2);

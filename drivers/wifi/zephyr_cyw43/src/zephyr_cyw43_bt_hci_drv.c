@@ -201,10 +201,94 @@ out:
 }
 
 #if defined(CONFIG_BT_HCI_SETUP)
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/addr.h>
+
+/*
+ * Derive the expected BT public address from the WiFi MAC.
+ *
+ * The CYW43 controller derives its BT BD_ADDR from the WiFi MAC + 1 (the WiFi
+ * MAC is read from OTP at cyw43 init and cached in cyw43_state.mac). The MAC is
+ * a 48-bit big-endian value (mac[0] is the most-significant octet), so "+1"
+ * increments from the last octet with carry. bt_addr_t stores the address
+ * little-endian (val[0] is the least-significant octet).
+ */
+static void cyw43_expected_bt_addr(bt_addr_t *out)
+{
+	uint8_t mac[6];
+	int i;
+
+	memcpy(mac, cyw43_state.mac, sizeof(mac));
+
+	for (i = 5; i >= 0; i--) {
+		if (++mac[i] != 0U) {
+			break;
+		}
+	}
+
+	for (i = 0; i < 6; i++) {
+		out->val[i] = mac[5 - i];
+	}
+}
+
+/*
+ * HCI vendor/controller setup hook (runs during bt_enable, after HCI Reset).
+ *
+ * The CYW43 BT firmware is already downloaded by the shared-bus transport in
+ * zephyr_cyw43_bt_hci_init(), and the controller exposes a valid OTP-derived
+ * public address, so there is no vendor command we must issue to make the
+ * controller usable. What we DO here is a "known controller init" sanity check:
+ * read the controller's BD_ADDR and verify it is the expected WiFi-MAC+1 public
+ * address. A zero/broadcast or mismatched address is surfaced loudly rather
+ * than silently shipping a wrong identity. This is intentionally read-only to
+ * avoid perturbing a controller that already reports the correct address.
+ */
 static int zephyr_cyw43_bt_hci_setup(const struct device *dev,
 				  const struct bt_hci_setup_params *param)
 {
-	LOG_DBG("zephyr_cyw43_bt_hci_setup() not implemented");
+	struct bt_hci_rp_read_bd_addr *rp;
+	struct net_buf *rsp = NULL;
+	bt_addr_t expected;
+	char got_s[BT_ADDR_STR_LEN];
+	char exp_s[BT_ADDR_STR_LEN];
+	int err;
+
+	ARG_UNUSED(dev);
+	ARG_UNUSED(param);
+
+	err = bt_hci_cmd_send_sync(BT_HCI_OP_READ_BD_ADDR, NULL, &rsp);
+	if (err) {
+		LOG_ERR("HCI Read_BD_ADDR failed (err %d)", err);
+		return err;
+	}
+
+	rp = (void *)rsp->data;
+	if (rp->status) {
+		LOG_ERR("HCI Read_BD_ADDR status 0x%02x", rp->status);
+		net_buf_unref(rsp);
+		return -EIO;
+	}
+
+	cyw43_expected_bt_addr(&expected);
+	bt_addr_to_str(&rp->bdaddr, got_s, sizeof(got_s));
+	bt_addr_to_str(&expected, exp_s, sizeof(exp_s));
+
+	if (bt_addr_eq(&rp->bdaddr, BT_ADDR_ANY) ||
+	    bt_addr_eq(&rp->bdaddr, BT_ADDR_NONE)) {
+		LOG_ERR("controller reported invalid public BD_ADDR %s", got_s);
+		net_buf_unref(rsp);
+		return -EIO;
+	}
+
+	if (!bt_addr_eq(&rp->bdaddr, &expected)) {
+		LOG_WRN("controller public BD_ADDR %s != expected WiFi-MAC+1 %s",
+			got_s, exp_s);
+	} else {
+		LOG_INF("controller public BD_ADDR %s verified (= WiFi MAC + 1)",
+			got_s);
+	}
+
+	net_buf_unref(rsp);
 	return 0;
 }
 
