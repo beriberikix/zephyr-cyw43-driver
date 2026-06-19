@@ -61,9 +61,20 @@ The RP2350 (rp_pico2/w) is a Raspberry-Pi-produced device, so this use is within
 the license grant. Redistribution in source and binary form is permitted with
 the copyright notice retained (conditions 1–3 of LICENSE.RP).
 
-**Do NOT switch to the Infineon EULA blobs.** This reference is intentionally
-pinned to the RP-licensed combined blob; the Infineon AIROC/WHD EULA firmware is
-out of scope and has incompatible redistribution terms.
+**Do NOT switch to the Infineon EULA blobs** *(default `main`/`harden-coex` scope)*.
+On those branches this reference is intentionally pinned to the RP-licensed
+combined blob; the Infineon AIROC/WHD EULA firmware is out of scope and has
+incompatible redistribution terms.
+
+> **Exception — `whd-port` branch (decision 2026-06-19).** The AIROC/WHD
+> transport port (`CONFIG_CYW43_TRANSPORT_WHD`, see `docs/whd-contract.md`)
+> deliberately scopes the Infineon EULA blobs **in**: WHD WiFi firmware/CLM ship
+> as C arrays in `hal_infineon`, gated by the Cypress EULA at
+> `modules/hal/infineon/zephyr/blobs/license.txt` and fetched with
+> `west blobs fetch hal_infineon`. This applies **only** to the WHD backend on
+> the `whd-port` branch; the georgerobotics default (`main`/`harden-coex`)
+> remains RP-licensed and EULA-free. The BT patchram still uses the vendored
+> combined blob (BT firmware is unchanged by the port).
 
 ### Pinning policy
 

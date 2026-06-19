@@ -29,6 +29,10 @@ then `arm-zephyr-eabi-gdb -nx -batch -ex "target extended-remote :3333" -ex "mon
 `pkill -f probe-rs` SELF-MATCHES the Bash tool's own command line (it contains the literal
 string "probe-rs") and kills the shell (exit 144). Use a bracket-regex so the pattern text
 itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pkill -f '[g]db'`.
+EXTENDED (W0): `pkill -f '[g]db'` ALSO self-kills any shell whose command text contains the
+literal "gdb" — e.g. a gdb binary path like `arm-zephyr-eabi-gdb` or a `GDB=...gdb` var — because
+`-f` matches the whole command line, not just the bracket pattern. When the script itself invokes
+gdb, do NOT `pkill` gdb: run gdb with `-batch` (it exits on its own) and guard only `pkill -x openocd`.
 
 ## Status legend: TODO | IN-PROGRESS | VERIFIED(<artifact path>)
 
@@ -44,6 +48,45 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | 6 | Firmware blob pinned + provenance/license recorded | VERIFIED | REFERENCE.md §1 — wb43439A0_7_95_49_00_combined.h SHA-256 6b4b9a71…, cyw43-driver v1.0.4, RP (non-EULA) license, runtime versions logged. |
 | SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load; zero lockups/faults/disconnects) | ACCEPTED w/ DOCUMENTED RESIDUAL (operator accept+document; gate's "zero faults / 2h continuous" NOT met) | SHIPPED CODE (coop -2, a17aecd): soak_bounded_8boot_coop2_20260619.log — 8 SWD-reset cold boots × 90s bounded load (dev ping 1/s + host ping 0.5/s + notify 9.6/s): 0 faults, 0 disconnects, 6073 notif/630s. Sustained: soak_bounded_long_20260619.log — a single link streamed clean ~19min (11180 notif, 0 stalls) then FAULTED at 1162s. So the §2.7 below-driver gSPI cybt corruption is a LOW-RATE PROBABILISTIC fault, mitigated by the BT-TX bus lock (8df7566) but NOT eliminated; MTBF ~tens of min sustained, worse under heavy load. Same root cause hits a heavy BT scan flood (item 3 re-check). Root cause + envelope + transport-fix recommendation in REFERENCE.md §2.7. See "SOAK ROOT CAUSE — gSPI corruption". |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | VERIFIED | REFERENCE.md §2 — HCI-over-gSPI framing, transport primitives, single-lock poll arbitration + poll-priority rule, init/power ordering, BD_ADDR derivation, controller caps. |
+
+---
+
+## WHD PORT (resume pointer) — branch `whd-port`
+
+The AIROC/WHD transport port. Plan: `~/.claude/plans/humble-nibbling-church.md`.
+Contract checklist: `docs/whd-contract.md`. One `/loop` iteration = advance the next
+non-VERIFIED milestone to VERIFIED with a committed hardware log. **Never mark VERIFIED
+without a real Pico 2 W log.** Stop condition (DONE): **W6 VERIFIED** (clean 2 h soak).
+
+Reframing (take as given): there is no AIROC gSPI BT HCI transport upstream — the WiFi
+side moves to WHD (`hal_infineon`, upstream `zephyr/drivers/wifi/infineon/` reference),
+the BT side **retains `cybt_shared_bus`** but is re-arbitrated onto the WHD lock and (W6)
+its F1-overflow-aware backplane read. A build-time `CONFIG_CYW43_TRANSPORT_{GEORGEROBOTICS,WHD}`
+choice keeps the proven stack as default/fallback; the whole matrix stays green throughout.
+
+| # | Milestone | Status | Artifact |
+|---|-----------|--------|----------|
+| W0 | Transport switch (Kconfig choice + guarded CMake WHD branch) + §1 EULA-blob lift + this section + blob fetch; build matrix green + georgerobotics boot smoke | VERIFIED | docs/artifacts/w0_kconfig_matrix_20260619.log — georgerobotics {wifi+bt, wifi-only} + WHD wifi-only all link green; georgerobotics boots to idle (gdb, not arch_system_halt); 43439A0.bin (249KB)+clm fetched. WHD+BT deferred to W3 (BT host needs the HCI device → `undefined reference __device_dts_ord_82`). |
+| W1 | WHD WiFi-only scan (whd_init/attach/wifi_on/scan over PIO-SPI Zephyr device; resolves R1) | TODO | (pending) w1_whd_scan |
+| W2 | WHD associate + DHCP via Zephyr net L2 (mirror airoc_wifi.c) | TODO | (pending) w2_whd_assoc_dhcp |
+| W3 | BT-only bring-up over WHD-arbitrated bus; SEAM-1 primitives; BD_ADDR=MAC+1 | TODO | (pending) w3_whd_bt_bringup, w3_bdaddr_10boots |
+| W4 | Coexistence parity — unchanged soak.sh/rx_stress.sh/ble_central.py; BT survives wifi disconnect | TODO | (pending) w4_whd_coex_soak |
+| W5 | Init/power-order matrix (BT-only / WiFi→BT / BT→WiFi) + WiFi-only WHD build | TODO | (pending) w5_whd_initorder |
+| W6 | §2.7 fix: BT ring-index read via WHD F1-overflow-aware path (durable hal_rpi_pico patch); full 2 h soak zero faults | TODO | (pending) w6_soak_2h_clean |
+| W7 | (optional) flip default to CYW43_TRANSPORT_WHD; matrix green | TODO | (pending) w7_default_flip |
+
+WHD-port build matrix (all must stay green every milestone):
+```
+# WHD mode (wifi+bt)
+west build -p always -b rpi_pico2/rp2350a/m33/w -d build_whd app \
+  -- -DEXTRA_CONF_FILE="$PWD/app/local.conf" -DCONFIG_CYW43_TRANSPORT_WHD=y
+# regression: proven georgerobotics stack (wifi+bt)
+west build -p always -b rpi_pico2/rp2350a/m33/w -d build_pico2 app \
+  -- -DEXTRA_CONF_FILE="$PWD/app/local.conf"
+# WiFi-only link check
+west build -p always -b rpi_pico2/rp2350a/m33/w -d build_wifionly app \
+  -- -DEXTRA_CONF_FILE="$PWD/app/local.conf" -DCONFIG_BT=n
+```
 
 ## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
 ROOT CAUSE: I_HMB_FC_CHANGE (the BT "data ready" interrupt flag in
