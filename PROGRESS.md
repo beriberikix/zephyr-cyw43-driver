@@ -38,12 +38,43 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | M0.1 | Driver app builds+flashes+boots on Pico 2 W with WIFI+BT in one image; `wifi connect` associates AND `bt init`+advertise succeed (rebase to 4.4 + add rpi_pico2 overlay + reconcile cyw43 GPIO binding) | VERIFIED | docs/artifacts/m0.1_wifi_bt_20260619.log (STA COMPLETED, DHCP 192.168.11.20; bt init ok, id 88:A2:9E:D1:6D:A0; advertising started) |
 | 1 | HCI setup / BD_ADDR (stable correct public addr across 10 cold boots) | VERIFIED | docs/artifacts/item1_bdaddr_10boots_20260619.log (10/10 boots = 88:A2:9E:D1:6D:A0, distinct=1, STABLE; setup hook verified =WiFi MAC+1 all 10) |
 | 2 | SCO/ISO separation (ISO correct; SCO routed or cleanly gated) | VERIFIED | docs/artifacts/item2_iso_smoke_20260619.log (ISO RX guarded by CONFIG_BT_ISO w/ BT_BUF_ISO_IN; SCO dropped not mis-routed; ISO build green; bt init+advertise+WiFi coex healthy. Controller lacks ISO HW -> no ISO/SCO traffic, routing verified by build+code) |
-| 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | TODO | |
-| 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | TODO | |
+| 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | IN-PROGRESS | RX hardening committed (1679e8f); event-flood 150s/773 evt/0 RX faults (docs/artifacts/item3_rx_stress_20260619.log). Full pass gated on item 4 (scan-off command-timeout). |
+| 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | IN-PROGRESS | ROOT FAULT FOUND (see "Item 4 fault" below) — critical soak blocker |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | TODO | |
 | 6 | Firmware blob pinned + provenance/license recorded | TODO | |
 | SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | TODO | |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | TODO | |
+
+## Item 4 fault (CRITICAL — bus arbitration; blocks SOAK)
+Symptom: kernel oops (reason 3) in the shell thread; gdb backtrace:
+  arch_system_halt(reason=3) <- z_fatal_error <- z_arm_svc, esf on shell_uart_stack.
+  faulting PC = bt_hci_cmd_send_sync+164 @ hci_core.c:482 ->
+  BT_ASSERT_MSG(err==0, "Controller unresponsive, command opcode 0x%04x timeout").
+i.e. a synchronous HCI command (e.g. LE Set Scan Enable from `bt scan on/off`)
+gets NO command-complete/status back within HCI_CMD_TIMEOUT under shared-gSPI-bus
+contention.
+
+Two independent reproductions (both on the normal hardened reference image):
+  (a) `bt scan on` (BT RX flood) + `net ping ... 192.168.11.1` (WiFi TX/RX)
+      concurrently -> oops within seconds.
+  (b) heavy `bt scan on` advertising flood alone, then `bt scan off` -> oops on
+      the scan-off command (RX flood starves the command/response path).
+Confirmed PRE-EXISTING: the item-2 baseline (before the item-3 RX hardening)
+faults identically, so this is NOT an RX-hardening regression.
+
+Hypothesis / where to look (item 4):
+  - Single shared gSPI bus carries WiFi (cyw43_ll) AND BT (cybt_shared_bus). The
+    cooperative cyw43 poll thread + the lock discipline must serialize bus
+    access so a BT HCI command write + its command-complete read are not starved
+    by a WiFi transfer or by a flood of inbound BT events.
+  - Look at: the poll thread priority/stack and CYW43_THREAD_ENTER/EXIT lock in
+    cyw43_configport.h; cyw43_bus_pio_spi.c spi_transceive_dt usage; how
+    zephyr_cyw43_bt_hci_send (shell/host TX thread) arbitrates vs the poll thread
+    doing cyw43_bluetooth_hci_read; whether bt_hci command TX waits behind WiFi
+    RX; whether HCI_CMD_TIMEOUT vs poll latency is the issue.
+  - This is the heart of the coexistence contract for REFERENCE.md.
+Repro tooling: test/coex/rx_stress.sh (flood), and the (a) case:
+  bt init; bt scan on; net ping -c 5 192.168.11.1  (on build_pico2 image).
 
 ## Build matrix (keep green)
 - Combined WiFi+BT (app/prj.conf): GREEN, hardware-verified (M0.1, item 1).
@@ -93,16 +124,17 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
 UART is wired and working (done). Console driven via test/coex/console.py.
 
 ## NEXT UP (resume pointer)
-M0.0, M0.1, item 1, item 2 are VERIFIED. Next highest-priority unverified item:
-  -> item 3: RX robustness (check cyw43_bluetooth_hci_read return; NULL-buf drop
-     policy on bt_buf_get_evt/get_rx exhaustion; length bounds checks).
-Then items 4 (threading/arbitration), 5 (power/init order), 6 (blob pin) + REF + SOAK.
-Board currently holds the canonical reference app (build_pico2/zephyr/zephyr.elf,
-no ISO). Resume needs only: `source ../.venv/bin/activate`, then build/flash/console
-via the recipes above. Rebuild the reference app with:
-  west build -b rpi_pico2/rp2350a/m33/w -d build_pico2 app
-Re-run the cold-boot harness after RX/poll changes; re-run a coex smoke after any
-RX/TX/poll/arbitration change.
+M0.0, M0.1, item 1, item 2 VERIFIED. item 3 RX hardening committed (event-flood
+fault-free); item 3 full pass + item 4 are coupled by the "Item 4 fault" above.
+  -> NEXT: item 4 — fix the bus-arbitration / HCI-command-timeout fault (see
+     "Item 4 fault" section: repro, gdb evidence, hypothesis). This is the
+     critical soak blocker; do it before items 5/6/SOAK.
+  -> Then re-run test/coex/rx_stress.sh (should pass clean) to fully verify item 3,
+     and a concurrent WiFi+BT stress (scan + net ping) should survive.
+Board holds the canonical reference app (build_pico2, no ISO). Resume:
+  source ../.venv/bin/activate
+  west build -b rpi_pico2/rp2350a/m33/w -d build_pico2 app   # if rebuild needed
+Re-run cold-boot + coex stress after any RX/TX/poll/arbitration change.
 
 ## Artifacts (this run)
 - Build (WIFI+BT, rpi_pico2): build_pico2/zephyr/zephyr.elf (+ .uf2), build succeeds clean.
@@ -121,6 +153,14 @@ RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- Item 3 RX hardening committed (1679e8f) + item 4 root fault found. RX path now
+  checks read() return, bounds cyw43_len/parsed lengths, and drops on NULL-buf
+  instead of NULL-deref. Event-flood stress (discardable=1, 150s, 773 reports)
+  fault-free & responsive. Discovered the CRITICAL item-4 bus-arbitration fault:
+  bt_hci_cmd_send_sync "Controller unresponsive" timeout under concurrent
+  WiFi+BT or under heavy BT RX flood (pre-existing; baseline faults too). Full
+  details + repro + hypothesis in "Item 4 fault" above. Added test/coex/
+  rx_stress.sh + rx_stress.conf.
 - Item 2 (SCO/ISO separation) VERIFIED. RX: ISO case now guarded by
   CONFIG_BT_ISO (BT_BUF_ISO_IN + bt_hci_iso_hdr, iso_hdr scoped locally); SCO
   given its own case that DROPS with a warning instead of being parsed as ISO
