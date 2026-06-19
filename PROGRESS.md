@@ -125,7 +125,43 @@ either stack's firmware loads. Verified on hardware (item5 artifact):
 Added CONFIG_APP_WIFI_AUTOCONNECT (app/Kconfig, default y) so a BT-only / BT-first
 boot is buildable (-DCONFIG_APP_WIFI_AUTOCONNECT=n).
 
+## BLE-connection command-timeout (TOP soak blocker — reopens item-4 fragility)
+The soak BLE half (CONFIG_APP_BLE_PERIPHERAL=y, build_soak) revealed the item-4
+"Controller unresponsive" fault is NOT fully fixed: a real BLE central connect +
+CCC subscribe FAULTS the Pico with NO WiFi load.
+REPRO:
+  west build -p always -b rpi_pico2/rp2350a/m33/w -d build_soak app -- \
+    -DEXTRA_CONF_FILE="$PWD/app/local.conf" -DCONFIG_APP_BLE_PERIPHERAL=y
+  flash; then on the host: python test/coex/ble_central.py --addr 88:A2:9E:D1:6D:A0
+  -> central: connects, start_notify -> "GATT Protocol Error: Unlikely Error", disconnects.
+  -> Pico: DEAD. gdb: oops reason 3 on sys_work_q_stack, pc = bt_hci_cmd_send_sync+164
+     (hci_core.c:482 "Controller unresponsive, command opcode timeout").
+So the item-4 poll-priority fix (coop -14 -> -1) helped WiFi+BT + advertise+cmd,
+but a real connection + GATT subscribe + the 100ms notify thread still starves an
+HCI command-complete past HCI_CMD_TIMEOUT.
+NEXT-LOOP DEBUG PLAN:
+  - Build with test/coex/debug_threads.conf; repro; at the fault capture ALL
+    thread states (`kernel thread list`) to see who holds/starves the bus and
+    where the poll/BT-RX-WQ/sys_work_q are.
+  - Hypotheses to test: (a) the 100ms notify thread (ACL TX) floods the bus and
+    starves the command path -> try slower/CCC-gated notify, or send via the BT
+    tx path properly; (b) sys_work_q stack (was 86% in the thread audit) too
+    small -> bump CONFIG_SYSTEM_WORKQUEUE_STACK_SIZE; (c) BT_SHELL + self-start
+    peripheral both manage BT/adv -> try CONFIG_BT_SHELL=n in the soak build;
+    (d) the poll loop processes only ONE BT pkt per pass (cyw43_ctrl.c:224) so a
+    burst backs up -> drain BT per poll wake (loop in our poll thread using
+    cyw43_ll_bt_has_work). This (d) is the most likely real fix and is the same
+    root the scan-flood console artifact hinted at.
+  - The soak cannot pass until a connected BLE peripheral with notifications is
+    stable under WiFi load; fix this first, then re-verify item 4 with a REAL
+    connection (not just advertise+cmd).
+
 ## SOAK plan + environment findings (last item remaining)
+NETWORK RESOLVED (operator): host + Pico both on SSID "funrun", same /22 subnet
+(host 192.168.5.215, Pico 192.168.4.28), host<->Pico ping 0% loss -> true
+bidirectional WiFi load is now possible (need iperf v2 for zperf, or a TCP/UDP
+load gen; no iperf3 on host yet). bleak installed (3.0.2) via `uv pip install`.
+local.conf updated to funrun (rebuild to apply). BLE works over direct RF.
 Everything except SOAK is VERIFIED. Soak harness needs (none built yet):
 1. App: a connectable BLE PERIPHERAL with a notify GATT characteristic (current
    app only has the BT shell `bt advertise`). Add a small GATT service +
@@ -202,8 +238,18 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
 UART is wired and working (done). Console driven via test/coex/console.py.
 
 ## NEXT UP (resume pointer)
-M0.0, M0.1, items 1-6 VERIFIED. Remaining: REF (full transport contract in
-REFERENCE.md §2) and SOAK (2h + 5 cold boots).
+M0.0, M0.1, items 1-6, REF VERIFIED. Remaining: SOAK — BLOCKED on the
+"BLE-connection command-timeout" above (a real BLE connect+subscribe faults the
+controller even without WiFi load).
+  -> NEXT: debug + fix the BLE-connection command-timeout (see that section's
+     plan; hypothesis (d) drain-BT-per-poll is most promising). Then re-verify a
+     stable connected BLE peripheral, THEN run the soak (network is ready:
+     funrun, host<->Pico OK, bleak installed; soak build = -DCONFIG_APP_BLE_PERIPHERAL=y;
+     WiFi load = host<->Pico or Pico->internet; BLE = test/coex/ble_central.py;
+     cold boots = SWD reset). Soak scope (full 2h x5 vs reduced) still an open
+     operator decision.
+Board holds canonical app (build_pico2, funrun creds, no peripheral).
+OLD remaining note (superseded): REF is now done.
   -> NEXT: REF — fill REFERENCE.md §2 transport/arbitration contract (HCI-over-gSPI
      4-byte header + H4 indicators; read/write/has_work/ensure_up primitives; the
      single recursive-mutex poll-loop arbitration model incl. the poll-thread
@@ -240,6 +286,13 @@ coex) after ANY RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- Soak BLE half built (BLE notify peripheral + bleak central, 43fda24) and the
+  network unblocked (operator moved host+Pico to "funrun", host<->Pico reachable,
+  bleak installed). BUT validating it exposed that the item-4 command-timeout is
+  NOT fully fixed: a real BLE connect + CCC subscribe faults the controller
+  ("Controller unresponsive") with no WiFi load. SOAK blocked on this; full
+  debug plan in "BLE-connection command-timeout" above. (item 4's advertise+cmd
+  coex still passes; the fix is real but insufficient for a live connection.)
 - Item 6 (firmware blob pinning) done. Created REFERENCE.md §1 with the combined
   wb43439A0_7_95_49_00 blob SHA-256, provenance (cyw43-driver v1.0.4), the RP
   (non-EULA) license, and runtime-reported WiFi/BT firmware versions.
