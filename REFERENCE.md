@@ -222,15 +222,24 @@ on the resulting out-of-range index instead of retrying. (Upstream even ships a
 These uphold the single-bus arbitration contract but cannot prevent corruption
 that occurs *below* host serialization, inside the gSPI transport.
 
-**Certified operating envelope (hardware-verified, zero faults).** STA associated
-+ BLE central connected + a notify characteristic streaming (~9.6 notif/s) +
-**bounded bidirectional WiFi load** (device→internet ping ~1/s, host→device ping
-~0.5/s): **8 SWD-reset cold boots, 0 faults, 0 unexpected BLE disconnects, 6070
-notifications over 630 s connected** (`test/coex/results/soak_bounded_8boot_20260619.log`),
-plus a sustained single-connection run
-(`test/coex/results/soak_bounded_long_20260619.log`). No-load and light-load
-operation is clean; the fault appears only under sustained heavy concurrent
-throughput and is probabilistic (not every heavy connection faults).
+**Operating envelope (hardware-measured).** STA associated + BLE central connected
++ a notify characteristic streaming (~9.6 notif/s) + **bounded bidirectional WiFi
+load** (device→internet ping ~1/s, host→device ping ~0.5/s):
+- **Short connections:** 8 SWD-reset cold boots × 90 s = **0 faults, 0 unexpected
+  disconnects, 6070 notifications / 630 s connected**
+  (`test/coex/results/soak_bounded_8boot_20260619.log`).
+- **Sustained connection:** a single continuous link streamed cleanly for
+  **~19 min (11180 notifications, 9.6/s, max inter-notify gap 0.32 s, 0 stalls)
+  and then took the fault at ~1162 s**
+  (`test/coex/results/soak_bounded_long_20260619.log`).
+
+So the fault is **probabilistic and low-rate, not eliminated**, even at bounded
+load: MTBF is short-connection-clean but ≈ tens of minutes for a sustained link
+(it scales with cumulative BLE-TX × WiFi-bus interaction time, and is far more
+frequent under heavy throughput — see the moderate-load runs at ~2 faults / 4
+connections). No-load / light-load is clean. The original soak gate's "zero
+faults over 2 h continuous" is therefore **NOT met**; this residual is accepted
+and documented (operator decision) pending the transport-level fix below.
 
 **Recommendation for the WHD port / a production fix.** Make the BT backplane read
 robust at the transport: detect the out-of-range index and **re-read** (the
