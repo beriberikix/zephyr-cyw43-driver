@@ -305,7 +305,26 @@ static int zephyr_cyw43_bt_hci_send(const struct device *dev, struct net_buf *bu
 	cyw43_len = buf->len + CYW43_PACKET_HEADER_SIZE;
 
 	LOG_DBG("Calling cyw43_bluetooth_hci_write() type=0x%02x", packet_type);
+	/*
+	 * Bus-arbitration invariant: WiFi (cyw43_ll) and BT
+	 * (cybt_shared_bus) share one gSPI bus, serialized by the cyw43
+	 * bus mutex (cyw43_thread_enter/exit == zephyr_cyw43_lock). The
+	 * poll thread holds it around every read (cyw43_poll); WiFi mgmt
+	 * ops hold it around every transfer. But cyw43_bluetooth_hci_write()
+	 * is the ONE bus path the georgerobotics code does NOT wrap in
+	 * CYW43_THREAD_ENTER, so a BT HCI TX from the host's bt_tx_processor
+	 * thread would issue SPI transactions concurrently with the poll
+	 * thread. The cyw43 bus code yields/sleeps mid-transfer
+	 * (CYW43_EVENT_POLL_HOOK k_yield, CYW43_SDPCM_SEND_COMMON_WAIT
+	 * k_sleep), so even cooperative threads interleave: the controller's
+	 * shared-memory ring indices read back corrupt (>= BTSDIO_FWBUF_SIZE)
+	 * -> cybt assert -> panic. Hold the bus lock for the write. The
+	 * mutex is recursive with priority inheritance, so the higher-prio
+	 * poll thread is not inverted while we hold it.
+	 */
+	cyw43_thread_enter();
 	rv = cyw43_bluetooth_hci_write(cyw43_txbuf, cyw43_len);
+	cyw43_thread_exit();
 	LOG_DBG("cyw43_bluetooth_hci_write() rv=%d", rv);
 	LOG_HEXDUMP_DBG(buf->data, buf->len, "HCI TX data:");
 	LOG_DBG("zephyr_cyw43_bt_hci_send(), len = %d\n", buf->len);
