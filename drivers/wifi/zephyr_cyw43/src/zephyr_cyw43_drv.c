@@ -37,25 +37,40 @@ zephyr_cyw43_dev_t *zephyr_cyw43_dev = &zephyr_cyw43_0;
  *
  * This thread is the sole reader of the gSPI bus; it reads HCI events and WiFi
  * packets and hands them to the Bluetooth host RX workqueue (cooperative prio
- * CONFIG_BT_RX_PRIO, default -8) and the WiFi RX queue. It MUST stay
- * cooperative: the georgerobotics cyw43_ll code relies on the poll thread not
- * being preempted for its implicit mutual exclusion (making it preemptible
+ * K_PRIO_COOP(CONFIG_BT_RX_PRIO) == coop -8) and the WiFi RX queue. It MUST
+ * stay cooperative: the georgerobotics cyw43_ll code relies on the poll thread
+ * not being preempted for its implicit mutual exclusion (making it preemptible
  * corrupts cyw43_ll state -> assert/abort under concurrent WiFi+BT load).
  *
- * The original K_PRIO_COOP(2) == -14 was the *highest* cooperative priority, so
- * under a sustained host-wake flood the poll thread's k_yield() (the
- * CYW43_EVENT_POLL_HOOK) never handed off to the lower-priority BT RX
- * workqueue: events were read off the bus but never delivered to the host, and
- * bt_hci_cmd_send_sync() timed out ("Controller unresponsive"). Running the
- * poll thread at the LOWEST cooperative priority keeps the no-preemption
- * guarantee while letting k_yield() release the CPU to every consumer
- * (BT RX WQ, WiFi RX, bt_tx) so command-completes are delivered promptly.
+ * Priority history (all cooperative, so none preempts another):
+ *  - K_PRIO_COOP(2) == coop -14 (original, HIGHEST): under a host-wake flood
+ *    the poll's only yield (CYW43_EVENT_POLL_HOOK k_yield()) could not hand off
+ *    to a LOWER coop thread, so events were read but never delivered ->
+ *    command timeout. Predates the per-wake drain (drain loop below).
+ *  - coop -2 (LOWEST band): delivered command-completes promptly but sat BELOW
+ *    the BT RX workqueue (-8). Under sustained WiFi load the RX WQ, processing
+ *    a notify-event burst, monopolised the CPU cooperatively and the poll could
+ *    not run, so the controller's small bt2host ring OVERFLOWED before the next
+ *    drain -> panic("cyw43 buffer overflow") in cybt_hci_read (~33% of
+ *    moderate-load soak cycles).
+ *  - coop -10 (current): one band ABOVE both BT cooperative threads (BT RX WQ
+ *    -8 and BT HCI TX -9). The sole bus reader now wins the CPU the instant a
+ *    consumer yields/blocks, so it drains the bt2host ring before it overflows.
+ *    The per-wake drain (CYW43_POLL_DRAIN_MAX) empties pending work and then
+ *    the poll BLOCKS on event_sem, which releases the CPU to the RX WQ / WiFi
+ *    RX / bt_tx for delivery -- so the -14-era "read but never delivered"
+ *    timeout does not recur (the poll blocks rather than spin-yielding).
  *
- * K_PRIO_COOP(n) == -CONFIG_NUM_COOP_PRIORITIES + n, so the highest valid n
- * (NUM_COOP_PRIORITIES-1) yields cooperative priority -1, just above the
- * preemptible band.
+ * K_PRIO_COOP(x) == -(CONFIG_NUM_COOP_PRIORITIES - x); a SMALLER x is a higher
+ * (more negative) priority. CONFIG_BT_RX_PRIO/CONFIG_BT_HCI_TX_PRIO are those
+ * x indices, so MIN(...)-1 is one band above the higher-priority of the two.
  */
+#if defined(CONFIG_BT)
+#define EVENT_POLL_THREAD_PRIO \
+	(MIN(CONFIG_BT_RX_PRIO, CONFIG_BT_HCI_TX_PRIO) - 1)
+#else
 #define EVENT_POLL_THREAD_PRIO (CONFIG_NUM_COOP_PRIORITIES - 2)
+#endif
 K_KERNEL_STACK_MEMBER(zephyr_cyw43_event_poll_stack, EVENT_POLL_THREAD_STACK_SIZE);
 
 /* Max cyw43_poll() iterations to drain per poll-thread wake (bounds bus-lock
