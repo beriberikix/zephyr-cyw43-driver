@@ -37,13 +37,22 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | M0.0 | Reliable single-command flash + a console the loop can drive (shell round-trip); image confirmed running via gdb | VERIFIED | docs/artifacts/m0.0_console_20260619.log (flash Verified OK + gdb idle + `kernel version`->`Zephyr version 4.4.99`) |
 | M0.1 | Driver app builds+flashes+boots on Pico 2 W with WIFI+BT in one image; `wifi connect` associates AND `bt init`+advertise succeed (rebase to 4.4 + add rpi_pico2 overlay + reconcile cyw43 GPIO binding) | VERIFIED | docs/artifacts/m0.1_wifi_bt_20260619.log (STA COMPLETED, DHCP 192.168.11.20; bt init ok, id 88:A2:9E:D1:6D:A0; advertising started) |
 | 1 | HCI setup / BD_ADDR (stable correct public addr across 10 cold boots) | VERIFIED | docs/artifacts/item1_bdaddr_10boots_20260619.log (10/10 boots = 88:A2:9E:D1:6D:A0, distinct=1, STABLE; setup hook verified =WiFi MAC+1 all 10) |
-| 2 | SCO/ISO separation (ISO correct; SCO routed or cleanly gated) | TODO | |
+| 2 | SCO/ISO separation (ISO correct; SCO routed or cleanly gated) | VERIFIED | docs/artifacts/item2_iso_smoke_20260619.log (ISO RX guarded by CONFIG_BT_ISO w/ BT_BUF_ISO_IN; SCO dropped not mis-routed; ISO build green; bt init+advertise+WiFi coex healthy. Controller lacks ISO HW -> no ISO/SCO traffic, routing verified by build+code) |
 | 3 | RX robustness (read() return checked; NULL-buf drop policy; length bounds) | TODO | |
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | TODO | |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | TODO | |
 | 6 | Firmware blob pinned + provenance/license recorded | TODO | |
 | SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | TODO | |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | TODO | |
+
+## Build matrix (keep green)
+- Combined WiFi+BT (app/prj.conf): GREEN, hardware-verified (M0.1, item 1).
+- WiFi-only (`-DCONFIG_BT=n`): GREEN (links; bt_hci_drv.c excluded via
+  sources_ifdef(CONFIG_BT), `select BT_HCI_SETUP if BT` doesn't fire).
+- BT-only as CONFIG_WIFI=n: NOT SUPPORTED by this driver architecture — the BT
+  transport (cybt_shared_bus over gSPI) is part of WIFI_ZEPHYR_CYW43, which
+  `depends on WIFI`. "BT-only" here means the runtime BT-without-WiFi-association
+  scenario (item 5), not a WIFI=n build. Document this constraint in REFERENCE.md.
 
 ## DONE when
 M0.0 + M0.1 + items 1-6 + SOAK + REF all VERIFIED, WiFi-only and BT-only builds still green,
@@ -99,7 +108,26 @@ The app is already flashed (build_pico2/zephyr/zephyr.elf) and boots healthy; no
 - Flash proven: openocd "Verified OK" on both hello_world and the WIFI+BT app.
 - gdb run-confirm of WIFI+BT app: idles in arch_cpu_idle (healthy). Logged to PROGRESS.
 
+## Controller (CYW4343A2) capability findings (for REFERENCE.md / scope)
+- HCI 5.2 (0x0b), manufacturer 0x0131 (Infineon/Cypress).
+- Does NOT support LE Extended Advertising (HCI 0x2036/0x203a -> status 0x01
+  "Unknown HCI Command"). Enabling features that pull in BT_EXT_ADV (e.g. ISO
+  broadcaster/periodic adv) breaks even legacy `bt advertise on`. Stick to
+  legacy advertising for the BLE-coex scope.
+- Does NOT support LE ISO (`iso listen` -> -ENOTSUP). No CIS/BIS audio. ISO RX
+  path in the driver is therefore preventive-correct only on this controller.
+- bt init warns "Num of Controller's ACL packets != ACL bt_conn_tx contexts
+  (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
+
 ## Changelog (newest first)
+- Item 2 (SCO/ISO separation) VERIFIED. RX: ISO case now guarded by
+  CONFIG_BT_ISO (BT_BUF_ISO_IN + bt_hci_iso_hdr, iso_hdr scoped locally); SCO
+  given its own case that DROPS with a warning instead of being parsed as ISO
+  (the old code shared one case, using ISO buf/header for SCO). Main app (no
+  ISO) and ISO-unicast smoke build both green; on HW bt init + legacy advertise
+  + WiFi stay healthy with ISO compiled in. Controller lacks ISO/SCO hardware
+  so no such traffic flows (documented above); routing correctness is by
+  build + code. Added test/coex/iso_smoke.conf.
 - Item 1 (HCI setup / BD_ADDR) VERIFIED. Implemented CONFIG_BT_HCI_SETUP
   (select BT_HCI_SETUP if BT in the module Kconfig): the setup() hook reads the
   controller BD_ADDR via HCI Read_BD_ADDR and verifies it equals WiFi MAC + 1

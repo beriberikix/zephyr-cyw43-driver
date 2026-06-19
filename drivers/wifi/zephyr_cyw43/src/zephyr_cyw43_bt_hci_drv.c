@@ -78,7 +78,6 @@ void cyw43_bluetooth_hci_process(void) {
 	bool discardable = false;
 	k_timeout_t timeout = K_FOREVER;
 	struct bt_hci_acl_hdr acl_hdr = { .len = 0 };
-	struct bt_hci_iso_hdr iso_hdr = { .len = 0 };
 	uint32_t cyw43_len;
 	uint32_t len;
 	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
@@ -121,12 +120,30 @@ void cyw43_bluetooth_hci_process(void) {
 		}
 
 		break;
-	case BT_HCI_H4_ISO:
-	case BT_HCI_H4_SCO:
+#if defined(CONFIG_BT_ISO)
+	case BT_HCI_H4_ISO: {
+		struct bt_hci_iso_hdr iso_hdr;
+
 		buf = bt_buf_get_rx(BT_BUF_ISO_IN, timeout);
 		memcpy(&iso_hdr, &rxmsg[1], sizeof(iso_hdr));
-		len = sizeof(struct bt_hci_iso_hdr) + bt_iso_hdr_len(sys_le16_to_cpu(iso_hdr.len));
+		len = sizeof(struct bt_hci_iso_hdr) +
+		      bt_iso_hdr_len(sys_le16_to_cpu(iso_hdr.len));
 		LOG_DBG("ISO len = %d", len);
+		break;
+	}
+#endif /* CONFIG_BT_ISO */
+	case BT_HCI_H4_SCO:
+		/*
+		 * Classic SCO (synchronous audio) has a different header and
+		 * buffer type than ISO and is out of scope for WiFi+BLE
+		 * coexistence; the CYW43 BLE path never delivers it. Drop it
+		 * here rather than mis-parsing it as ISO (the previous code
+		 * conflated the two, using BT_BUF_ISO_IN and bt_hci_iso_hdr for
+		 * SCO).
+		 */
+		LOG_WRN("dropping unsupported SCO packet (cyw43_len %u)", cyw43_len);
+		buf = NULL;
+		len = 0;
 		break;
 	default:
 		buf = NULL;
