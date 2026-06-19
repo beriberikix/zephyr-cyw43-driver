@@ -42,7 +42,7 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | VERIFIED | docs/artifacts/item4_coex_arbitration_20260619.log — root-caused poll-thread priority inversion; fixed (coop -14 -> -1); realistic coex (advertise+WiFi load+HCI cmds) 4 rounds clean. Full 2h soak = SOAK row. |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | VERIFIED | docs/artifacts/item5_initorder_20260619.log — BT-only, WiFi-then-BT, BT-then-WiFi all clean; BT survives WiFi disconnect cycles (shared power not dropped). |
 | 6 | Firmware blob pinned + provenance/license recorded | VERIFIED | REFERENCE.md §1 — wb43439A0_7_95_49_00_combined.h SHA-256 6b4b9a71…, cyw43-driver v1.0.4, RP (non-EULA) license, runtime versions logged. |
-| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load; zero lockups/faults/disconnects) | ACCEPTED w/ DOCUMENTED RESIDUAL (operator accept+document; gate's "zero faults / 2h continuous" NOT met) | Short conns clean: soak_bounded_8boot_20260619.log — 8 SWD-reset cold boots × 90s, 0 faults, 0 disconnects, 6070 notif/630s at bounded load (dev ping 1/s + host ping 0.5/s + notify 9.6/s). Sustained: soak_bounded_long_20260619.log — one link streamed clean ~19min (11180 notif, 0 stalls) then FAULTED at 1162s. So the below-driver gSPI cybt corruption is a LOW-RATE PROBABILISTIC fault, mitigated (poll -10 5c17ff6 + BT-TX bus lock 8df7566) but NOT eliminated; MTBF ~tens of min sustained, worse under heavy load. Root cause + envelope + transport-fix recommendation in REFERENCE.md §2.7. See "SOAK ROOT CAUSE — gSPI corruption". |
+| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load; zero lockups/faults/disconnects) | ACCEPTED w/ DOCUMENTED RESIDUAL (operator accept+document; gate's "zero faults / 2h continuous" NOT met) | SHIPPED CODE (coop -2, a17aecd): soak_bounded_8boot_coop2_20260619.log — 8 SWD-reset cold boots × 90s bounded load (dev ping 1/s + host ping 0.5/s + notify 9.6/s): 0 faults, 0 disconnects, 6073 notif/630s. Sustained: soak_bounded_long_20260619.log — a single link streamed clean ~19min (11180 notif, 0 stalls) then FAULTED at 1162s. So the §2.7 below-driver gSPI cybt corruption is a LOW-RATE PROBABILISTIC fault, mitigated by the BT-TX bus lock (8df7566) but NOT eliminated; MTBF ~tens of min sustained, worse under heavy load. Same root cause hits a heavy BT scan flood (item 3 re-check). Root cause + envelope + transport-fix recommendation in REFERENCE.md §2.7. See "SOAK ROOT CAUSE — gSPI corruption". |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | VERIFIED | REFERENCE.md §2 — HCI-over-gSPI framing, transport primitives, single-lock poll arbitration + poll-priority rule, init/power ordering, BD_ADDR derivation, controller caps. |
 
 ## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
@@ -386,16 +386,18 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
       reflash, drive via `openocd ... -c "rtt setup/start"` + TCP socket. More setup.
 UART is wired and working (done). Console driven via test/coex/console.py.
 
-## NEXT UP (resume pointer) — near DONE
-Code is at coop -2 (a17aecd; poll -10 reverted) + BT-TX bus lock (8df7566).
-All driver-fixable items done. The ONE residual everywhere (soak + heavy BT
-flood) is the §2.7 below-driver cybt gSPI corruption — operator accepted +
-documented, transport-level fix recommended. Remaining before final summary:
-  -> IN FLIGHT: bounded soak at coop -2 (newest test/coex/results/soak_*.log)
-     to make the certification artifact match the SHIPPED code. Check SUMMARY.
-  -> Then: produce the DONE summary (honest: all driver code fixes VERIFIED;
-     SOAK accepted-with-documented-residual; item 3 host-handling VERIFIED,
-     heavy-flood fault = §2.7 below-driver limit). Nothing else outstanding.
+## NEXT UP (resume pointer) — COMPLETE (driver scope)
+Shipped code: coop -2 (a17aecd) + BT-TX bus lock (8df7566). All driver-fixable
+items VERIFIED on hardware. Bounded soak re-verified at the shipped code
+(soak_bounded_8boot_coop2_20260619.log: 8 cold boots, 0 faults). The ONE
+residual (sustained/heavy load: long soak link, dense BT flood) is the §2.7
+below-driver cybt gSPI corruption — root-caused (persists with the bus lock
+held), operator-accepted + documented, transport-level fix recommended (NOT a
+host-side defect; out of this driver's reach without patching the vendored
+pico-sdk cybt HAL). Nothing else outstanding in driver scope.
+  -> If resumed: the only open work is the operator's transport-level fix
+     decision (patch cybt to retry-on-corrupt-index / handle F1-overflow on the
+     BT read), or a full 2h gate once that lands. Both are beyond this driver.
 
 ## (superseded) earlier resume pointer
 M0.0, M0.1, items 1-6, REF VERIFIED. SOAK is BLOCKED (escalated) — root cause
