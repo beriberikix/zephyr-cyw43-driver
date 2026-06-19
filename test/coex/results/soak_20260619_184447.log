@@ -1,0 +1,326 @@
+=== characterization soak 20260619_184447  cycles=6 max_conn=75s ===
+----- cycle 1/6 2026-06-19T18:44:47Z -----
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+net ping -c 1000000 -i 60 8.8.8.8
+PING 8.8.8.8
+[41D[J[00:00:08.807,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.807,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.807,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.807,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.807,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+[1;32muart:~$ [mnet[41D[J[1;32muart:~$ [mnet28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=12 ttl=115 time=62 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=13 ttl=115 time=57 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=14 ttl=115 time=56 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=15 ttl=115 time=59 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=17 ttl=115 time=45 ms
+scanning for 'test-picow-bluetooth' / 88:A2:9E:D1:6D:A0 ...
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+connected; subscribing ...
+disconnected (teardown)
+=== BLE CENTRAL SUMMARY ===
+notifications: 705
+duration: 75.0s   rate: 9.4/s
+max inter-notify gap: 0.360s
+stalls over 3.0s: 0
+last counter value: 704
+unexpected disconnect: False
+RESULT: PASS
+>> cycle 1: notif=705 conn=75.0s end=ALIVE disc=0
+----- cycle 2/6 2026-06-19T18:46:22Z -----
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+net ping -c 1000000 -i 60 8.8.8.8
+PING 8.8.8.8
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=1 ttl=115 time=51 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=2 ttl=115 time=26 ms
+[41D[J[00:00:08.806,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.806,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.806,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.807,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.807,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+[1;32muart:~$ [mnet[41D[J[1;32muart:~$ [mnet28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=3 ttl=115 time=35 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=5 ttl=115 time=23 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=6 ttl=115 time=25 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=7 ttl=115 time=22 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=8 ttl=115 time=30 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=9 ttl=115 time=56 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=10 ttl=115 time=29 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=11 ttl=115 time=27 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=12 ttl=115 time=23 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=13 ttl=115 time=33 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=14 ttl=115 time=43 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=15 ttl=115 time=25 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=16 ttl=115 time=30 ms
+scanning for 'test-picow-bluetooth' / 88:A2:9E:D1:6D:A0 ...
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+connected; subscribing ...
+disconnected (teardown)
+=== BLE CENTRAL SUMMARY ===
+notifications: 707
+duration: 75.1s   rate: 9.4/s
+max inter-notify gap: 0.315s
+stalls over 3.0s: 0
+last counter value: 706
+unexpected disconnect: False
+RESULT: PASS
+>> cycle 2: notif=707 conn=75.1s end=ALIVE disc=0
+----- cycle 3/6 2026-06-19T18:47:56Z -----
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+net ping -c 1000000 -i 60 8.8.8.8
+PING 8.8.8.8
+[41D[J[00:00:08.809,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.809,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.809,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.809,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.809,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+[1;32muart:~$ [mnet[41D[J[1;32muart:~$ [mnetscanning for 'test-picow-bluetooth' / 88:A2:9E:D1:6D:A0 ...
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+connected; subscribing ...
+disconnected (teardown)
+=== BLE CENTRAL SUMMARY ===
+notifications: 282
+duration: 29.5s   rate: 9.6/s
+max inter-notify gap: 0.180s
+stalls over 3.0s: 0
+last counter value: 281
+unexpected disconnect: False
+RESULT: PASS
+>> cycle 3: notif=282 conn=29.5s end=FAULT disc=0
+----- cycle 4/6 2026-06-19T18:49:30Z -----
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+net ping -c 1000000 -i 60 8.8.8.8
+PING 8.8.8.8
+[41D[J[00:00:08.805,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.805,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.805,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.805,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.805,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+[1;32muart:~$ [mnet[41D[J[1;32muart:~$ [mnetscanning for 'test-picow-bluetooth' / 88:A2:9E:D1:6D:A0 ...
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+connected; subscribing ...
+disconnected (teardown)
+=== BLE CENTRAL SUMMARY ===
+notifications: 722
+duration: 75.1s   rate: 9.6/s
+max inter-notify gap: 0.270s
+stalls over 3.0s: 0
+last counter value: 721
+unexpected disconnect: False
+RESULT: PASS
+>> cycle 4: notif=722 conn=75.1s end=ALIVE disc=0
+----- cycle 5/6 2026-06-19T18:51:04Z -----
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+net ping -c 1000000 -i 60 8.8.8.8
+PING 8.8.8.8
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=1 ttl=115 time=53 ms
+[41D[J[00:00:08.803,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.804,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.804,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.804,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.804,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+[1;32muart:~$ [mnet[41D[J[1;32muart:~$ [mnet28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=2 ttl=115 time=39 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=4 ttl=115 time=47 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=5 ttl=115 time=30 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=6 ttl=115 time=32 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=7 ttl=115 time=33 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=8 ttl=115 time=35 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=9 ttl=115 time=29 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=10 ttl=115 time=27 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=11 ttl=115 time=24 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=12 ttl=115 time=31 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=13 ttl=115 time=31 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=14 ttl=115 time=28 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=15 ttl=115 time=34 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=16 ttl=115 time=30 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=17 ttl=115 time=28 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=18 ttl=115 time=30 ms
+scanning for 'test-picow-bluetooth' / 88:A2:9E:D1:6D:A0 ...
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+EARLY DISCONNECT (unexpected)
+connected; subscribing ...
+disconnected (teardown)
+=== BLE CENTRAL SUMMARY ===
+notifications: 0
+duration: 0.0s   rate: 0.0/s
+max inter-notify gap: 0.000s
+stalls over 3.0s: 0
+last counter value: None
+unexpected disconnect: True
+RESULT: FAIL
+>> cycle 5: notif=0 conn=0.0s end=ALIVE disc=1
+----- cycle 6/6 2026-06-19T18:51:28Z -----
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+net ping -c 1000000 -i 60 8.8.8.8
+PING 8.8.8.8
+[41D[J[00:00:08.808,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.808,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.808,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.808,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.808,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+[1;32muart:~$ [mnet[41D[J[1;32muart:~$ [mnetscanning for 'test-picow-bluetooth' / 88:A2:9E:D1:6D:A0 ...
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+connected; subscribing ...
+disconnected (teardown)
+=== BLE CENTRAL SUMMARY ===
+notifications: 713
+duration: 75.0s   rate: 9.5/s
+max inter-notify gap: 0.315s
+stalls over 3.0s: 0
+last counter value: 712
+unexpected disconnect: False
+RESULT: PASS
+>> cycle 6: notif=713 conn=75.0s end=ALIVE disc=0
+=== SUMMARY ===
+cycles: 6   faults: 1   clean-disconnects: 1
+total connected time: 329.7s   total notifications: 3129
+MTBF (connected): 329.7 s/fault over 329.7 s
+artifact: /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/test/coex/results/soak_20260619_184447.log

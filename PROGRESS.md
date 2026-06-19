@@ -42,7 +42,7 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | VERIFIED | docs/artifacts/item4_coex_arbitration_20260619.log — root-caused poll-thread priority inversion; fixed (coop -14 -> -1); realistic coex (advertise+WiFi load+HCI cmds) 4 rounds clean. Full 2h soak = SOAK row. |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | VERIFIED | docs/artifacts/item5_initorder_20260619.log — BT-only, WiFi-then-BT, BT-then-WiFi all clean; BT survives WiFi disconnect cycles (shared power not dropped). |
 | 6 | Firmware blob pinned + provenance/license recorded | VERIFIED | REFERENCE.md §1 — wb43439A0_7_95_49_00_combined.h SHA-256 6b4b9a71…, cyw43-driver v1.0.4, RP (non-EULA) license, runtime versions logged. |
-| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | NEARLY (no-load/light=perfect; moderate-load residual ~33% fault) | test/coex/results/ — fault-blocker RESOLVED (was 100% crash). Disconnects gone (0/6). Residual: cybt bt2host-ring overflow under sustained moderate WiFi load from cooperative-thread starvation (BT RX WQ -8 starves poll -2); buffer bump didn't help. See "residual cybt overflow". Needs the scheduling fix + full 2h gate. |
+| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | NEARLY (residual cybt overflow now RARE after poll coop -10; heavy-load 3/3 clean; need long-run rate + operator scope) | test/coex/results/ — poll raised to coop -10 (5c17ff6, above BT RX WQ -8 + BT HCI TX -9). Moderate 6-cycle: 1/6 faults (was 2/6). Heavy-load (Pico ping ~40/s + host ping 5/s + BLE 9/s) 3/3 clean incl. 2x full-90s/~800 notif. Residual = same cybt_hci_read 4 KB bt2host-ring overflow (shared-bus latency, not buffer exhaustion). Option (b) inline-recv NOT viable (this Zephyr's bt_hci_recv always defers to a workq). Long-run rate + full 2h gate scope = operator call. |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | VERIFIED | REFERENCE.md §2 — HCI-over-gSPI framing, transport primitives, single-lock poll arbitration + poll-priority rule, init/power ordering, BD_ADDR derivation, controller caps. |
 
 ## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
@@ -94,19 +94,37 @@ overflows. Mechanism = COOPERATIVE-THREAD STARVATION, not buffer exhaustion:
 Measured (moderate load, host->Pico ping + Pico->8.8.8.8 ping, 75s cycles):
   6 cycles, faults 2, disconnects 0, 3634 notifications, 387s connected.
   No-load and light-load = perfect (no fault). Artifacts: test/coex/results/.
-THE SCHEDULING DILEMMA (next-loop options to try, each needs FULL coex re-verify):
-  (a) poll ABOVE BT RX WQ (e.g. coop -9): poll drains the ring promptly so it
-      never overflows; for a CONNECTION the poll still goes idle between events
-      so the RX WQ runs to deliver command-completes (the item-4 starvation was
-      only under an artificial scan-print FLOOD, which the soak doesn't do).
-      Risk: re-introduces the scan-flood command-timeout edge case -> mitigate
-      or accept (it's a documented console artifact).
-  (b) CONFIG_BT_RECV_WORKQ_BT=n (deliver BT inline from the poll) -- removes the
-      poll-vs-RX-WQ contention, but inline host processing runs under the cyw43
-      bus lock (deadlock risk) -- evaluate carefully.
-  (c) lower the notify rate / cap the WiFi load to the "within threshold" the
-      spec allows (the fault is load-proportional).
-  Then run the FULL gate (2h x N cold boots; scope = operator call).
+THE SCHEDULING DILEMMA — RESOLUTION THIS LOOP:
+  (a) DONE (commit 5c17ff6): poll raised from coop -2 to coop -10, one band
+      ABOVE both BT cooperative threads (BT RX WQ -8, BT HCI TX -9) via
+      MIN(CONFIG_BT_RX_PRIO, CONFIG_BT_HCI_TX_PRIO)-1. The sole bus reader now
+      wins the CPU the instant a consumer yields/blocks. RESULT: moderate
+      6-cycle 1/6 (was 2/6); HEAVY-load (Pico ping -i25 ~40/s + host ping -i0.2
+      + BLE 9/s) 3/3 clean, incl. two full 90s/~800-notif connections. The
+      feared -14-era timeout did NOT recur (per-wake drain empties work then the
+      poll BLOCKS on event_sem, releasing the CPU to the RX WQ for delivery).
+      WiFi-only + full builds green. NOTE: cooperative threads cannot PREEMPT
+      one another, so priority only helps at the margins (when the RX WQ
+      momentarily blocks); it cannot fully eliminate a long RX-WQ batch
+      monopolising the CPU -> the rare residual remains.
+  (b) RULED OUT: this Zephyr (zephyr/subsys/bluetooth/host/hci_core.c
+      rx_queue_put) has NO inline bt_hci_recv path -- it always k_work_submit()s
+      to either the SYS workq or the dedicated BT workq (the BT_RECV_WORKQ
+      choice). CONFIG_BT_RECV_WORKQ_BT=n just moves RX onto the SYSTEM workq
+      (shared with the net/WiFi stack) -- same or worse contention, not inline.
+  (c) AVAILABLE (operator decision): the spec PASS gate is bounded
+      ("WiFi throughput within threshold of baseline"), not unlimited load. The
+      residual is rare and load-sensitive; no-load/light = perfect. Certifying
+      against a defined load threshold is legitimate -- scope is operator's call.
+REFINED MECHANISM: the overflow is cybt_hci_read detecting fw_b2h_buf_count <
+  `available` (its static leftover) -> the controller's FIXED 4 KB bt2host ring
+  (BTSDIO_FWBUF_SIZE 0x1000, in controller firmware RAM, not host-tunable)
+  lapped because host read latency was too high. Under shared-bus contention the
+  gSPI bandwidth + cooperative CPU latency is the hard limit; priority mitigates
+  but a single 3-pin bus shared by WiFi+BT has an inherent ceiling.
+RATE WITH coop -10 (aggregate): moderate 5/6 clean (1 fault) + heavy 3/3 clean
+  -> ~1 fault in ~9 cycles, down from ~1 in 3. A 12-cycle soak is running to
+  pin the rate; full 2h x N gate scope = operator call.
 
 ## Item 4 RESOLVED (poll-thread priority inversion) — analysis
 ROOT CAUSE: the cyw43 shared-bus poll thread (sole gSPI reader; feeds the BT
@@ -324,19 +342,24 @@ the probe "U" connector not being wired to the Pico UART0. Two ways forward:
 UART is wired and working (done). Console driven via test/coex/console.py.
 
 ## NEXT UP (resume pointer)
-M0.0, M0.1, items 1-6, REF VERIFIED. SOAK: fault-blocker RESOLVED; disconnects
-gone (0/6). ONE residual: cybt bt2host-ring overflow under sustained moderate
-WiFi load (~33% of 75s cycles) = cooperative-thread starvation (see "residual
-cybt overflow" for full analysis + 3 options).
-  -> NEXT (most promising, option a): raise the poll thread ABOVE the BT RX WQ
-     (e.g. K_PRIO_COOP s.t. it's just above CONFIG_BT_RX_PRIO == coop -8, try
-     coop -9) so the poll always drains the bt2host ring before it overflows.
-     Then FULLY re-verify (priority change = wide blast radius): the 6-cycle
-     soak (expect 0 faults), the item-4 advertise+net-ping coex, the scan-flood
-     case (watch for a re-introduced command timeout -- it was a console
-     artifact), cold-boot BD_ADDR (item 1), and the RX stress (item 3). WiFi-only
-     + full builds green.
-  -> Then run the full gate: 2h x N SWD-reset cold boots (scope = operator call).
+M0.0, M0.1, items 1-6, REF VERIFIED. SOAK: poll-priority fix (a) DONE (5c17ff6,
+coop -2 -> -10). Residual cybt overflow is now RARE (~1 fault in ~9 cycles, was
+~1 in 3): moderate 5/6 clean + heavy-load 3/3 clean. Option (b) ruled out
+(no inline recv in this Zephyr). See "THE SCHEDULING DILEMMA — RESOLUTION".
+  -> IN FLIGHT: a 12-cycle/90s soak is running (artifact = newest
+     test/coex/results/soak_*.log; /tmp/soak12.out) to pin the residual fault
+     rate with coop -10. Check its SUMMARY on resume.
+  -> THEN: driver-side scheduling levers are EXHAUSTED (priority applied; inline
+     recv unavailable; bt2host ring is fixed 4 KB in controller FW). The
+     remaining residual is an inherent shared-3-pin-bus latency ceiling. DECISION
+     IS THE OPERATOR'S (it's in OPEN DECISIONS): (i) the WiFi-load threshold to
+     certify the soak against ("within threshold of baseline" per spec), (ii)
+     full-gate scope/duration (2h x N), (iii) whether the documented rare
+     load-sensitive cybt-overflow residual is acceptable as a known shared-bus
+     limitation for the reference driver. Ask these, then run the agreed gate.
+  -> Orthogonal re-verifies still worth doing for the priority change (low risk,
+     soak already exercises RX/TX/poll hardest): cold-boot BD_ADDR (item 1) and
+     rx_stress (item 3) on the canonical app.
 Tools: build_soak (-DCONFIG_APP_BLE_PERIPHERAL=y + soak.conf), test/coex/soak.sh
 (gdb fault-check; net ping blocks the shell so use gdb for liveness),
 ble_central.py (teardown disconnect no longer false-flags). Board: canonical app.
@@ -393,6 +416,22 @@ coex) after ANY RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- Soak residual mitigated + characterized (commit 5c17ff6). Raised the gSPI poll
+  thread from coop -2 to coop -10 (one band above BT RX WQ -8 and BT HCI TX -9,
+  via MIN(BT_RX_PRIO,BT_HCI_TX_PRIO)-1) so the sole bus reader drains the
+  controller's 4 KB bt2host ring before it overflows. Moderate 6-cycle soak
+  improved 2/6 -> 1/6 faults; heavy-load gdb fault-capture (Pico ping ~40/s +
+  host ping 5/s + BLE 9/s) was 3/3 CLEAN incl. two full 90s/~800-notif
+  connections (no fault, no unexpected disconnect; backtraces healthy = poll
+  mid-SPI-read / idle). Ruled out option (b): this Zephyr's bt_hci_recv has no
+  inline path (always k_work_submit to SYS or BT workq), so RECV_WORKQ_BT=n
+  would only move RX to the shared system workq. Refined the overflow mechanism
+  (cybt_hci_read fw_b2h_buf_count < static `available`; ring is a fixed 4 KB FW
+  buffer) and concluded driver-side scheduling levers are exhausted; the rare
+  residual is an inherent shared-3-pin-bus latency ceiling -> soak load-threshold
+  + gate scope is an operator decision. WiFi-only + full builds green; checkpatch
+  clean. Artifacts: test/coex/results/soak_20260619_184447.log (moderate 1/6),
+  /tmp/faultcap.out (heavy 3/3 clean), 12-cycle soak in flight.
 - Soak residual narrowed. Fixed ble_central.py teardown false-positive (only a
   pre-window drop counts as an unexpected disconnect now) -> real disconnects are
   GONE (0/6). Bumped BT host buffers in soak.conf to test the cybt-overflow
