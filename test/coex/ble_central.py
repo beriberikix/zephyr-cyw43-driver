@@ -35,11 +35,19 @@ async def run(args):
     print(f"found {dev.address} ({dev.name}); connecting ...", flush=True)
 
     state = {"count": 0, "first": None, "last": None, "max_gap": 0.0,
-             "last_val": None, "gaps_over": 0, "disconnected": False}
+             "last_val": None, "gaps_over": 0, "disconnected": False,
+             "early_disconnect": False, "window_done": False}
 
     def on_disconnect(_):
         state["disconnected"] = True
-        print("DISCONNECTED", flush=True)
+        # Only an EARLY drop (before our window ended + teardown) is a real
+        # unexpected disconnect; the disconnect we trigger ourselves at teardown
+        # is expected.
+        if not state["window_done"]:
+            state["early_disconnect"] = True
+            print("EARLY DISCONNECT (unexpected)", flush=True)
+        else:
+            print("disconnected (teardown)", flush=True)
 
     def on_notify(_char, data: bytearray):
         now = time.monotonic()
@@ -62,6 +70,7 @@ async def run(args):
         end = time.monotonic() + args.duration
         while time.monotonic() < end and not state["disconnected"]:
             await asyncio.sleep(0.5)
+        state["window_done"] = True
         try:
             await client.stop_notify(NOTIFY_UUID)
         except Exception:
@@ -75,8 +84,8 @@ async def run(args):
     print(f"max inter-notify gap: {state['max_gap']:.3f}s", flush=True)
     print(f"stalls over {args.max_gap}s: {state['gaps_over']}", flush=True)
     print(f"last counter value: {state['last_val']}", flush=True)
-    print(f"unexpected disconnect: {state['disconnected']}", flush=True)
-    ok = (state["count"] > 0 and not state["disconnected"]
+    print(f"unexpected disconnect: {state['early_disconnect']}", flush=True)
+    ok = (state["count"] > 0 and not state["early_disconnect"]
           and state["gaps_over"] == 0)
     print("RESULT: " + ("PASS" if ok else "FAIL"), flush=True)
     return 0 if ok else 1

@@ -42,7 +42,7 @@ itself does not contain the match: `pkill -f 'probe[-]rs'; pkill -x openocd; pki
 | 4 | Threading / bus-arbitration audit (lock invariant under load; no prio inversion/stack overflow) | VERIFIED | docs/artifacts/item4_coex_arbitration_20260619.log — root-caused poll-thread priority inversion; fixed (coop -14 -> -1); realistic coex (advertise+WiFi load+HCI cmds) 4 rounds clean. Full 2h soak = SOAK row. |
 | 5 | Shared WL_REG_ON/BT_REG_ON power (all init orders come up clean) | VERIFIED | docs/artifacts/item5_initorder_20260619.log — BT-only, WiFi-then-BT, BT-then-WiFi all clean; BT survives WiFi disconnect cycles (shared power not dropped). |
 | 6 | Firmware blob pinned + provenance/license recorded | VERIFIED | REFERENCE.md §1 — wb43439A0_7_95_49_00_combined.h SHA-256 6b4b9a71…, cyw43-driver v1.0.4, RP (non-EULA) license, runtime versions logged. |
-| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | ZERO-FAULT at moderate load (full 2h x5 not yet run) | test/coex/results/soak_20260619_174657.log — 4 cold-boot cycles, BLE notify peripheral + bidirectional WiFi load: 0 faults / 0 stalls over 269 s connected, 2550 notifications, 9.6/s. Residual: occasional BLE disconnect under sustained load (1/4 cycles dropped at 44 s; 3/4 ran the full window). Both root causes fixed (4f72d1f drain + 23eccd6 priority). |
+| SOAK | Coexistence soak passes (STA assoc + BLE connected + bidirectional load, >=2h + 5 cold boots; zero lockups/faults/disconnects; throughput & BLE latency within bounds) | NEARLY (no-load/light=perfect; moderate-load residual ~33% fault) | test/coex/results/ — fault-blocker RESOLVED (was 100% crash). Disconnects gone (0/6). Residual: cybt bt2host-ring overflow under sustained moderate WiFi load from cooperative-thread starvation (BT RX WQ -8 starves poll -2); buffer bump didn't help. See "residual cybt overflow". Needs the scheduling fix + full 2h gate. |
 | REF | REFERENCE.md transport+arbitration contract complete (for the future WHD port) | VERIFIED | REFERENCE.md §2 — HCI-over-gSPI framing, transport primitives, single-lock poll arbitration + poll-priority rule, init/power ordering, BD_ADDR derivation, controller caps. |
 
 ## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
@@ -77,16 +77,36 @@ RESIDUAL FIX (DONE, 23eccd6): poll thread coop -1 -> -2 so it preempts the -1
 WiFi rx_q and drains BT promptly (still yields to BT RX WQ -8). 4-cycle moderate-
 load soak: ZERO faults, 2550 notifications over 269 s, no stalls. Both root
 causes now fixed (drain 4f72d1f + priority 23eccd6).
-STILL OPEN for a full soak PASS:
-  - Occasional BLE disconnect under sustained load (1/4 cycles dropped at ~44 s;
-    no crash). Likely the host->Pico WiFi RX bursts contending with the BLE link;
-    investigate connection params / supervision timeout / whether it correlates
-    with WiFi RX spikes. Soak gate wants zero unexpected disconnects.
-  - Run the FULL gate: 2h x 5 cold boots (scope still an operator call; current
-    runs are minutes x a few cycles).
-  - Extreme load (Pico 100/s + host ping) still disconnects early (no crash) ->
-    a throughput ceiling, acceptable vs the spec's "within threshold" if the
-    threshold is moderate.
+RESIDUAL cybt overflow (the ONE remaining fault, ~33% of 75s cycles at moderate
+load): the BT side still hits panic("cyw43 buffer overflow") in cybt_hci_read
+(reason 4 / pc=abort on the poll thread) when the controller's bt2host ring
+overflows. Mechanism = COOPERATIVE-THREAD STARVATION, not buffer exhaustion:
+  - Disproven: bigger BT host buffers (EVT_RX 10->32, CONN_TX 3->8, ACL counts)
+    did NOT change the rate (6-cycle soak: still 2/6 faults) -> the poll is not
+    blocking on bt_buf_get.
+  - The BT RX workqueue runs at coop CONFIG_BT_RX_PRIO (-8), ABOVE the poll
+    thread (-2). When the RX WQ processes a burst of the notify event stream
+    (incl. a Number-of-Completed-Packets event per ACL packet) it monopolises
+    the CPU cooperatively, the poll can't run, and the controller overruns the
+    small bt2host ring before the poll next drains it.
+  - Disconnects are now GONE (0/6 with the fixed ble_central.py that no longer
+    flags the teardown disconnect).
+Measured (moderate load, host->Pico ping + Pico->8.8.8.8 ping, 75s cycles):
+  6 cycles, faults 2, disconnects 0, 3634 notifications, 387s connected.
+  No-load and light-load = perfect (no fault). Artifacts: test/coex/results/.
+THE SCHEDULING DILEMMA (next-loop options to try, each needs FULL coex re-verify):
+  (a) poll ABOVE BT RX WQ (e.g. coop -9): poll drains the ring promptly so it
+      never overflows; for a CONNECTION the poll still goes idle between events
+      so the RX WQ runs to deliver command-completes (the item-4 starvation was
+      only under an artificial scan-print FLOOD, which the soak doesn't do).
+      Risk: re-introduces the scan-flood command-timeout edge case -> mitigate
+      or accept (it's a documented console artifact).
+  (b) CONFIG_BT_RECV_WORKQ_BT=n (deliver BT inline from the poll) -- removes the
+      poll-vs-RX-WQ contention, but inline host processing runs under the cyw43
+      bus lock (deadlock risk) -- evaluate carefully.
+  (c) lower the notify rate / cap the WiFi load to the "within threshold" the
+      spec allows (the fault is load-proportional).
+  Then run the FULL gate (2h x N cold boots; scope = operator call).
 
 ## Item 4 RESOLVED (poll-thread priority inversion) — analysis
 ROOT CAUSE: the cyw43 shared-bus poll thread (sole gSPI reader; feeds the BT
@@ -364,6 +384,13 @@ coex) after ANY RX/TX/poll/arbitration change.
   (8 != 3)" — controller advertises 8 ACL buffers; benign (revisit in item 3/4).
 
 ## Changelog (newest first)
+- Soak residual narrowed. Fixed ble_central.py teardown false-positive (only a
+  pre-window drop counts as an unexpected disconnect now) -> real disconnects are
+  GONE (0/6). Bumped BT host buffers in soak.conf to test the cybt-overflow
+  mechanism -> did NOT help (still 2/6 faults), so it is cooperative-thread
+  starvation (BT RX WQ -8 > poll -2), not buffer exhaustion; reverted the bump.
+  Documented the scheduling dilemma + 3 next-step options. 6-cycle moderate-load
+  soak: 2 faults / 0 disconnects / 3634 notifications / 387 s.
 - SOAK BLOCKER RESOLVED (faults). Root-caused the live-BLE command-timeout to
   I_HMB_FC_CHANGE edge semantics + one-packet-per-assertion (fix: drain the full
   bt2host ring per BT poll, 4f72d1f) and a BT-read-latency ring overflow under
