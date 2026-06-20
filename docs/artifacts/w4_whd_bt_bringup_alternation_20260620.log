@@ -25,3 +25,10 @@ All on build_whd_soak (btc_mode coex fix in). Each trial: SWD reset, boot, BLE s
       needs a true/longer cold power-cycle to clear, OR exploit the determinism
       with a harness reset-until-BT-discoverable (the next boot always flips to
       working) to make the soak/2h gate reliable.
+
+## UPDATE: WL_REG_ON discharge 200 ms — STILL alternates (4/8, T,F,T,F,T,F,T,F)
+The toggling BT-core state survives a full 200 ms WL_REG_ON power-off, so discharge
+timing is CONCLUSIVELY ruled out and the toggle is deeper than chip power-down.
+=> Root fix likely needs a true USB power-cycle test (operator) to confirm whether
+   even that breaks it. Practical unblock = harness reset-until-BT-discoverable
+   (deterministic alternation => at most 1 extra reset to land in the working state).
