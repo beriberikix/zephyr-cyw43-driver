@@ -1,0 +1,28 @@
+W4/W6 — BLE TX-power A/B: georgerobotics vs WHD (same bench)   2026-06-20
+========================================================================
+Decisive discriminator for the marginal WHD BLE link (RSSI -92, early
+disconnect). Both builds = the SAME app/soak peripheral, SAME antenna, SAME
+combined BT firmware blob, SAME physical bench, measured minutes apart with the
+host BleakScanner.
+
+  georgerobotics soak (build_soak):   picow RSSI = -61, -62 dBm   (STRONG)
+  WHD soak (build_whd_soak):          picow RSSI = -92 dBm        (MARGINAL)
+
+=> ~30 dB BT TX-power deficit in WHD mode. NOT environmental (georgerobotics is
+strong on the same bench right now). At -92 the link drops during GATT service
+discovery (packet loss); at -61 it is robust. So fixing the TX power should fix
+the early-disconnect AND unblock the coex-soak throughput gate (W4/W6).
+
+ROOT CAUSE (to fix next): the georgerobotics cyw43_ll + cybt BT bring-up applies
+a BT TX-power / PA / WiFi+BT coex-arbitration configuration that the WHD-glue
+cybt bring-up (drivers/wifi/zephyr_cyw43/src/whd/whd_bt_glue.c) does NOT. The BT
+firmware (patchram) is identical, so the delta is an init/config step, not fw.
+Candidates: a coex/ECI-SECI enable so BT keeps antenna time while WHD WiFi is
+up; an HCI vendor-specific Tx-power command; a PA/power-table register write the
+georgerobotics path issues post-patchram. Diff the georgerobotics BT bring-up
+(cyw43_ll.c BT path + cybt cyw43_btbus_init) against whd_bt_glue.c's sequence.
+
+STATUS: this is the SOLE remaining blocker for W4 (notification baseline) and
+W6 (2 h gate). W0-W3, W5 VERIFIED; W6 §2.7 transport fixes (shared lock +
+cybt re-read) DONE. Coexistence is stable (0 faults); only BT RF strength is
+deficient.

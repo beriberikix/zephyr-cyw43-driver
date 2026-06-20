@@ -134,12 +134,17 @@ though device-side coex is healthy (0 faults).
       calls whd_bt_notify_irq), priority raised to PREEMPT(2), 20 ms fallback.
       Build+flash+test: STILL early-disconnects during service discovery. So RX
       latency was not the (sole) cause. Kept anyway (correct, lower-latency).
-  (B) Weak RSSI (-92) — now the PRIME suspect (marginal RF link). When the
-      central does find the peripheral it is always ~-92 dBm (abnormal for a
-      bench device; georgerobotics on the SAME antenna+BT fw gave strong links +
-      6073 notif). At -92 discovery is intermittent and connections drop. Likely
-      a BT TX-power / PA / init-config step the georgerobotics cyw43_ll+cybt
-      bring-up does that whd_bt_glue.c's cybt-only bring-up omits.
+  (B) Weak RSSI — CONFIRMED root cause via A/B on the same bench
+      (docs/artifacts/w4_ble_txpower_ab_20260620.log): georgerobotics advertises
+      at -61 dBm, WHD at -92 dBm — a ~30 dB BT TX-power deficit, NOT
+      environmental. At -92 the link drops during GATT service discovery; -61 is
+      robust. Fixing TX power should fix the early-disconnect and unblock W4/W6.
+      The georgerobotics cyw43_ll+cybt BT bring-up applies a BT TX-power / PA /
+      WiFi+BT coex-arbitration config that whd_bt_glue.c omits (same patchram, so
+      it's an init step). NEXT: diff the georgerobotics BT bring-up (cyw43_ll.c
+      BT path + cybt cyw43_btbus_init) vs whd_bt_glue.c; look for a coex/ECI
+      enable, an HCI Tx-power VSC, or a PA/power register write issued
+      post-patchram, and replicate it in the WHD bring-up.
 
 NEXT (resume here): chase the weak-BT-signal root cause.
   1. Decouple BLE-peripheral start from WiFi autoconnect in app/src/main.c — the
