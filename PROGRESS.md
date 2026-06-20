@@ -119,7 +119,45 @@ mitigations are in place — cybt reads go through WHD's F1-overflow-aware
 backplane path (no assert/panic), and a shared recursive gSPI lock serializes
 WHD's WLAN path against BT. Result: WiFi associates with BT active, 0 faults.
 
-BLOCKED (2026-06-20, hardware-state — needs an operator power-cycle): the
+CORRECTED DIAGNOSIS (2026-06-20, SUPERSEDES the power-cycle block below): it is
+NOT accumulated chip state and NOT a power-cycle issue. The WHD-mode BT TX power
+is ~30 dB weak (advertising undiscoverable), PERSISTENTLY — a WHD BT bring-up
+CONFIG/RF gap, not a recoverable state. Decisive operator-free discriminator:
+  - Flashed the GEORGEROBOTICS auto-peripheral (build_soak) onto the SAME chip,
+    same bench, this moment: BT discoverable at RSSI -70 dBm, 274 adv pkts. The
+    BT hardware is FINE. (The host scanner is healthy too: it sees 100-274 adv
+    pkts/scan from other devices in every WHD scan; the Pico is just not among
+    them.)
+  - WHD build (build_whd_soak): BT undiscoverable whether WiFi is ASSOCIATED or
+    DISCONNECTED (`wifi disconnect` then re-scan = still nothing). So WiFi coex is
+    not the cause either.
+  - WiFi itself WORKS in WHD mode this session (boot got DHCP 192.168.4.27), so
+    the chip is alive — it is specifically the BT radio/TX that is weak in WHD.
+  => Matches the W4 A/B artifact (docs/artifacts/w4_ble_txpower_ab_20260620.log):
+     georgerobotics BT -61, WHD BT -92 = ~30 dB BT TX-power deficit. The earlier
+     "once stable WHD reaches -61" was transient/unreliable; the persistent state
+     is the ~30 dB deficit. Same cybt patchram + same Zephyr HCI host in both
+     builds, so the delta is CHIP-SIDE config the WHD WiFi bring-up sets
+     differently than georgerobotics' (NVRAM board RF / btc coex / PA / GCI), OR
+     a BT-power config/VSC georgerobotics applies and whd_bt_glue.c does not.
+  -> The operator does NOT need to power-cycle anything (the block below is wrong).
+  -> ESCALATED (3rd+ attempt on BLE link quality, deep RF/firmware): needs an
+     operator decision on strategy — see the AskUserQuestion at the end of the
+     2026-06-20 run. Candidate fixes, in rough order of ROI:
+       (a) NVRAM/coex: WHD Murata-1YN nvram has btc_mode=0, muxenab=0x11. Compare
+           vs georgerobotics wifi_nvram_43439.h btc/muxenab/boardflags; if the BT
+           coex/PA differs, that is likely it. (Editing the WHD nvram resource is
+           the hard part.)
+       (b) HCI VSC: issue a Cypress/Broadcom BT Set-Tx-Power vendor command from
+           the app post-bt_enable (needs the correct CYW43439 opcode/format).
+       (c) Pragmatic: the §2.7 HEADLINE fix (cybt re-read + shared bus lock) is
+           already functionally demonstrated (WiFi associates w/ BT active, 0
+           faults; the 495-notif PASS was real WHD). Certify WHD for WiFi + the
+           §2.7 fix and document the BT-TX-parity gap as the remaining WHD-port
+           item, rather than chase chip RF firmware config.
+
+(OBSOLETE — power-cycle hypothesis, kept for history; the georgerobotics A/B above
+falsifies it) BLOCKED (2026-06-20, hardware-state — needs an operator power-cycle): the
 device's BT advertising has degraded to UNDISCOVERABLE after this session's many
 SWD-reset-only cycles, so the under-load fixes below cannot be cleanly measured.
 Evidence (all this session):
