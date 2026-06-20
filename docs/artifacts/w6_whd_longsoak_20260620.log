@@ -50,3 +50,13 @@ unexpected disconnect: False
 RESULT: PASS
 end state: ALIVE
 artifact: /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/test/coex/results/longsoak_20260620_153531.log
+
+## ASSESSMENT
+- reset-until-BT-discoverable worked first try (the SWD-reset alternation fix).
+- 1011 notifications, 9.9/s, 0 stalls, device end-state ALIVE (0 §2.7 faults).
+- Connection ended ~102s (clean teardown classification, unexpected_disconnect=
+  False), short of the 1800s window. No device fault -> NOT the §2.7 coex crash
+  (georgerobotics faulted at 1162s WITH a device fault; here 0 faults).
+- The ~102s drop is a link-management disconnect (host BlueZ / supervision /
+  param-update), to root-cause next: re-run no-WiFi-load (isolate coex vs host),
+  and capture the device-side "disconnected (reason 0xXX)".

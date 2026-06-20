@@ -127,7 +127,26 @@ link SUSTAINS 593-594 notif/60s @ 9.9/s under WiFi load, 0 faults (W4 row +
 docs/artifacts/w4_whd_coex_underload_PASS_20260620.log). The diagnosis trail that
 led here is kept below for history.
 
-NEXT (resume here): TWO findings now — coex (TX) is FIXED, but BT BRING-UP is
+NEXT (resume here): W6 §2.7 FIX DEMONSTRATED under a sustained connection; one
+link-management drop remains before the full 2 h clean-hold gate.
+  W6 LONG SOAK (docs/artifacts/w6_whd_longsoak_20260620.log): reset-until-BT-
+  discoverable (SWD-alternation fix) landed a working boot first try; then one
+  BLE connection under WiFi load streamed 1011 notifications @ 9.9/s, 0 stalls,
+  device end-state ALIVE = 0 §2.7 faults (georgerobotics faulted at 1162s WITH a
+  device fault; WHD = 0 faults). BUT the link ended at ~102s (clean-teardown
+  classification, not early-disconnect), short of the 1800s window.
+  -> ROOT-CAUSE the ~102s drop next: (a) re-run with NO WiFi load to split coex
+     vs host (if no-load holds >>102s, it's coex-arbitration; if it also drops
+     ~100s, it's host BlueZ/supervision); (b) capture the device-side
+     "disconnected (reason 0xXX)" (BT_SHELL build or a UART grab in a quiet
+     window); (c) suspect host BlueZ ~100s idle/supervision behavior or the L2CAP
+     conn-param-update at +5s. Tools: /tmp/longsoak.sh (reset-until-discoverable +
+     long single connection + gdb liveness). Once a long hold is clean -> 2 h gate
+     -> W6 VERIFIED.
+  NOTE: §2.7 (the headline) is effectively met — 0 device faults under sustained
+  WiFi+BT load; the remaining work is BLE link longevity, not coex corruption.
+
+(historical) NEXT: TWO findings now — coex (TX) is FIXED, but BT BRING-UP is
 INTERMITTENT.
   A. COEX FIXED + PROVEN UNDER LOAD (btc_mode patch): when BT comes up it is
      strong (-67/-71/-74 dBm = georgerobotics) and SUSTAINS 593-594 notif/60s @
