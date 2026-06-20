@@ -85,3 +85,33 @@ git apply <this-repo>/patches/whd_nvram_43439_1yn_btcoex.patch
 **Verify:** `grep -nE 'btc_mode|muxenab' <...>/COMPONENT_MURATA-1YN/cyfmac43439-1YN.txt`
 should show `muxenab=0x100` and `btc_mode=1`. Rebuild with `-p always` (the NVRAM
 size is captured at CMake configure time).
+
+## airoc_wifi_bt_backplane_buffer_reserve.patch
+
+**Target:** `zephyr/drivers/wifi/infineon/airoc_wifi.c` (the upstream Zephyr AIROC
+WiFi driver).
+
+**Why (W6, the sustained-coex-load fix):** `airoc_pool` (a 20-buffer
+`NET_BUF_POOL_FIXED`) is shared by WiFi RX/TX **and** every BT backplane transfer
+(`whd_bus_transfer_backplane_bytes`, since BT runs over the same WHD gSPI bus).
+Under sustained moderate WiFi+BT load the WHD SDPCM TX queue stalls on bus
+contention and queued WiFi-TX buffers pile up until the whole pool is consumed;
+the BT backplane alloc then fails ("Packet buffer allocation failed in
+whd_bus_transfer_backplane_bytes") and the BLE link drops (~101 s). gdb-read
+counters proved RX is balanced and exactly 20 **TX** buffers are stuck.
+
+The patch tracks in-flight `airoc_pool` buffers and makes WiFi **data TX** yield
+(drop the packet; the net stack retransmits) once the pool falls to a small
+reserve (`AIROC_POOL_BT_RESERVE = 6`), so the BT backplane (and WiFi RX/control)
+always have buffers — BT-first buffer arbitration. Verified: under the moderate
+load that dropped at ~101 s, the BLE link now holds 300 s (2960 notif, 9.9/s, 0
+stalls, 0 faults). Also fixes a latent leak (a too-small buffer was returned
+without freeing).
+
+**Apply:**
+```
+cd <west-topdir>/zephyr
+git apply <this-repo>/patches/airoc_wifi_bt_backplane_buffer_reserve.patch
+```
+**Verify:** `grep -n AIROC_POOL_BT_RESERVE zephyr/drivers/wifi/infineon/airoc_wifi.c`.
+WHD-only (WIFI_AIROC); georgerobotics builds don't compile this file.

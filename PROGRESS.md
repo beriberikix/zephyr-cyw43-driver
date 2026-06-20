@@ -135,7 +135,17 @@ link-management drop remains before the full 2 h clean-hold gate.
   device end-state ALIVE = 0 §2.7 faults (georgerobotics faulted at 1162s WITH a
   device fault; WHD = 0 faults). BUT the link ended at ~102s (clean-teardown
   classification, not early-disconnect), short of the 1800s window.
-  ~101s DROP — LOCALIZED to a WiFi-TX-queue STALL (2026-06-20, instrumented):
+  ~101s DROP — FIXED (2026-06-20): BT-first buffer arbitration. The shared
+    airoc_pool was drained by stalled WiFi TX under coex contention, starving the
+    BT backplane. patches/airoc_wifi_bt_backplane_buffer_reserve.patch tracks
+    in-flight airoc_pool buffers and makes WiFi DATA TX yield (drop+retransmit)
+    once the pool falls to AIROC_POOL_BT_RESERVE(6), so the BT backplane always has
+    buffers. VERIFIED: under the moderate load that dropped at ~101s, the BLE link
+    now HOLDS 300s — 2960 notif, 9.9/s, 0 stalls, 0 faults, ALIVE
+    (test/coex/results/longsoak_20260620_173541.log). Builds green: build_whd_soak +
+    WHD WiFi-only(BT=n). NEXT: run the full 2h soak under moderate load -> W6 VERIFIED.
+
+  (historical) ~101s DROP — LOCALIZED to a WiFi-TX-queue STALL (2026-06-20, instrumented):
     Added per-direction alloc/release counters to airoc_wifi_host_buffer_get/release
     and gdb-read them at exhaustion: pdbg_alloc={TX 1217, RX 27471}, pdbg_rel={TX
     1197, RX 27471}. RX is perfectly balanced (no leak); TX has exactly 20 buffers
