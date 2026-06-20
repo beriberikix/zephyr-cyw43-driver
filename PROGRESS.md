@@ -119,16 +119,27 @@ mitigations are in place — cybt reads go through WHD's F1-overflow-aware
 backplane path (no assert/panic), and a shared recursive gSPI lock serializes
 WHD's WLAN path against BT. Result: WiFi associates with BT active, 0 faults.
 
-NEXT (resume here): BLE OVER-AIR DISCOVERABILITY. With coexistence up (WiFi+BT,
-0 faults), the BLE peripheral logs "starting advertising" but the host cannot
-discover test-picow-bluetooth (BleakScanner finds other devices, not the Pico;
-ble_central.py -> "peripheral not found in scan"), so the coex soak gets 0
-connections / 0 notifications. Likely HCI-level: BT RX is a 4 ms timer poll
-(whd_bt_glue.c, no host-wake IRQ hook) — adv-setup command-complete/events may
-be delayed/dropped, or advertising params/data not taking effect. Investigate
-with BT HCI logging (CONFIG_BT_HCI_DRIVER_LOG_LEVEL_DBG / a non-soak build with
-BT_SHELL to `bt advertise on` + host scan). This blocks W4's notification
-baseline and W6's 2 h gate. Build: build_whd_soak (whd.conf;soak.conf + whd.overlay).
+NEXT (resume here): BLE LINK ROBUSTNESS over WHD coex (diagnosed — see
+docs/artifacts/w4_ble_discoverability_diag_20260619.log). Advertising DOES work
+and IS discoverable (BT_SHELL build: `bt init`+`bt advertise on` -> host finds
+test-picow-bluetooth), so the adv path is fine. The problem is a MARGINAL link:
+RSSI ~ -92 dBm (very weak; intermittently not discovered), and on connect the
+central EARLY-DISCONNECTS during GATT service discovery (the first ACL/ATT
+round-trips). So the coex soak gets 0 stable connections / 0 notifications even
+though device-side coex is healthy (0 faults).
+Two prime suspects to fix next:
+  (A) BT RX latency/starvation — RX is a 4 ms timer poll (whd_bt_glue.c
+      bt_poll_thread, NO host-wake IRQ), and the W6 shared bus lock makes it
+      BLOCK while WHD's WLAN thread holds the bus. Fix: host-wake-IRQ-driven BT
+      RX + BT-first arbitration (mirror georgerobotics §2.3). NB WHD owns the
+      shared host-wake IRQ on GP24 (airoc_whd_hal_spi.c whd_bus_spi_irq_*) — BT
+      must hook/share it. Start here.
+  (B) Weak RSSI (-92) — possible BT TX-power / WiFi+BT coex-arbitration config
+      that the georgerobotics cyw43_ll path applied and WHD bring-up does not
+      (same antenna+BT fw gave strong links + 6073 notif in the georgerobotics
+      soak). Investigate after (A).
+This blocks W4's notification baseline and W6's 2 h gate. Builds: build_whd
+(BT_SHELL, manual diag) and build_whd_soak (auto peripheral).
 
 ## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
 ROOT CAUSE: I_HMB_FC_CHANGE (the BT "data ready" interrupt flag in

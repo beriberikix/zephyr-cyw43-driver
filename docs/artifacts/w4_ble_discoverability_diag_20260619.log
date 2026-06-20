@@ -1,0 +1,46 @@
+W4/W6 — BLE-over-air diagnosis (after the W6 shared-bus-lock fix)   2026-06-20
+=============================================================================
+Board: rpi_pico2/rp2350a/m33/w   Debug Probe if01 + host BlueZ/bleak
+Builds: build_whd (BT_SHELL, manual) and build_whd_soak (auto BLE peripheral),
+        both CONFIG_CYW43_TRANSPORT_WHD=y + the W6 shared bus lock.
+
+FINDINGS (BLE advertising/connection over WHD coex)
+---------------------------------------------------
+1. Advertising DOES work and IS emitted over-air. BT_SHELL build, manual
+   `bt init` (BD_ADDR 88:A2:9E:D1:6D:A0 verified) + `bt advertise on`
+   ("Advertising started") -> host BleakScanner FINDS test-picow-bluetooth.
+   So the HCI adv-setup commands complete and the controller radiates. The
+   earlier soak "not discoverable" was NOT a dead adv path.
+2. BUT the link is MARGINAL and ERRATIC:
+   - RSSI ~ -92 dBm when seen (abnormally weak for a bench device; expect
+     -40..-60). Sometimes not discovered at all within a 7-12 s scan window.
+   - ble_central.py finds + connects, then "EARLY DISCONNECT (unexpected):
+     failed to discover services, device disconnected" — the link drops during
+     GATT service discovery (the first burst of ATT request/response ACL
+     round-trips).
+3. Net effect on the coex soak: ble_central.py gets 0 stable connections /
+   0 notifications (build_whd_soak, 3+4 cycles), even though device-side coex is
+   healthy (WiFi associates with BT active, 0 faults — the W6 lock fix holds).
+
+LIKELY CAUSES (for the next iteration)
+--------------------------------------
+A. BT RX latency/starvation. RX is a 4 ms TIMER poll (whd_bt_glue.c
+   bt_poll_thread) with NO host-wake IRQ hook. Worse, the W6 shared bus lock
+   makes the BT poll BLOCK whenever WHD's WLAN thread holds the bus, so RX
+   latency spikes under WiFi activity. Sustained ACL (service discovery,
+   notifications) needs prompt, low-jitter RX — the poll likely can't keep the
+   connection's ATT round-trips inside timing, causing the early disconnect.
+   => Real fix: host-wake-IRQ-driven BT RX (not a fixed poll), and/or BT-first
+      arbitration so BT RX is serviced ahead of WLAN (mirrors the georgerobotics
+      single-poll BT-first design, REFERENCE §2.3). Note WHD OWNS the shared
+      host-wake IRQ on GP24 (airoc_whd_hal_spi.c whd_bus_spi_irq_*), so BT must
+      hook/share it rather than add a second IRQ.
+B. Weak RSSI (-92). Possibly BT TX power / WiFi+BT coex arbitration not
+   configured the way the georgerobotics cyw43_ll path did (same antenna + BT
+   firmware gave strong, stable links + 6073 notif in the georgerobotics soak).
+   Investigate coex/Tx-power config the georgerobotics stack applies that WHD
+   bring-up does not.
+
+STATUS: device-side §2.7 coex contention = FIXED (W6 part 1). BLE link
+robustness over WHD = NOT yet achieved -> W4 (notification baseline) and W6 (2 h
+gate) remain IN-PROGRESS, blocked here. No fabricated pass.
