@@ -34,3 +34,28 @@ should show the `__weak` fallbacks + the lock/unlock around the transfer.
 This is the "carry the transport fix as a durable patch, not a raw edit
 `west update` reverts" requirement from `REFERENCE.md §2.7` / `docs/whd-contract.md`
 item 7.
+
+## cybt_shared_bus_reread_index.patch
+
+**Target:** `modules/hal/rpi_pico/src/rp2_common/pico_cyw43_driver/cybt_shared_bus/cybt_shared_bus_driver.c`
+(the pico-sdk BT shared-bus driver in the `hal_rpi_pico` west module).
+
+**Why (W6, the §2.7 transport fix proper):** `cybt_get_bt_buf_index()` reads the
+BT controller's shared-memory ring indices over the gSPI backplane and upstream
+**`assert()`s** if any index is out of range — which aborts/panics the whole
+system. Under concurrent gSPI traffic (and even transiently at bring-up) those
+indices can read back corrupt (the §2.7 fault). The patch makes the function
+**re-read up to 8×** (the corruption is transient) and, only if it persists,
+return `CYBT_ERR_HCI_READ_FAILED` so the caller drops the cycle gracefully
+(`cyw43_bluetooth_has_pending()` → "no pending") instead of aborting. Fixed a
+real boot-time kernel panic in the WHD BT poll thread.
+
+**Apply:**
+```
+cd <west-topdir>/modules/hal/rpi_pico
+git apply <this-repo>/patches/cybt_shared_bus_reread_index.patch
+```
+**Verify:** `grep -n CYBT_BUF_INDEX_REREAD_MAX <...>/cybt_shared_bus_driver.c`.
+
+NB this file is compiled by BOTH transports (it is the shared BT bus driver), so
+the re-read hardening benefits the georgerobotics backend too.
