@@ -130,14 +130,28 @@ extern void cyw43_bluetooth_hci_process(void);
 extern bool cyw43_bluetooth_has_pending(void);
 
 #define BT_POLL_STACK_SIZE 2048
-#define BT_POLL_PRIO       K_PRIO_PREEMPT(8)
-/* Poll interval: fast enough for HCI command/event round-trips and ~10 notif/s
- * coex, slow enough not to hammer the backplane at idle. Tunable in W4. */
-#define BT_POLL_INTERVAL_MS 4
+/* Above the BT RX workqueue / bt_tx so a woken BT drain is serviced promptly
+ * (the WHD-mode analog of the georgerobotics BT-first poll, REFERENCE §2.3). */
+#define BT_POLL_PRIO       K_PRIO_PREEMPT(2)
+/* Fallback wakeup if a host-wake edge is missed (the CYW43439 WL_HOST_WAKE is
+ * edge-triggered and shared with WHD's WLAN path; I_HMB_FC_CHANGE also has edge
+ * semantics). The IRQ (whd_bt_notify_irq) is the primary wake — this only
+ * bounds latency for a missed edge. */
+#define BT_POLL_FALLBACK_MS 20
 
 static K_KERNEL_STACK_DEFINE(bt_poll_stack, BT_POLL_STACK_SIZE);
 static struct k_thread bt_poll_thread_data;
 static bool bt_poll_started;
+
+/* Signalled from the shared WL_HOST_WAKE ISR (WHD's whd_bus_spi_oob_irq_handler,
+ * via the durable airoc patch) so BT RX wakes immediately on controller data
+ * instead of waiting out a fixed poll interval. */
+static K_SEM_DEFINE(bt_irq_sem, 0, 1);
+
+void whd_bt_notify_irq(void)
+{
+	k_sem_give(&bt_irq_sem);
+}
 
 static void bt_poll_thread(void *a, void *b, void *c)
 {
@@ -146,12 +160,14 @@ static void bt_poll_thread(void *a, void *b, void *c)
 	ARG_UNUSED(c);
 
 	for (;;) {
+		/* Wake on host-wake IRQ; fall back to a short timeout for any
+		 * missed edge. Drain the whole pending ring under the bus lock. */
+		(void)k_sem_take(&bt_irq_sem, K_MSEC(BT_POLL_FALLBACK_MS));
 		cyw43_thread_enter();
 		if (cyw43_bluetooth_has_pending()) {
 			cyw43_bluetooth_hci_process();
 		}
 		cyw43_thread_exit();
-		k_msleep(BT_POLL_INTERVAL_MS);
 	}
 }
 

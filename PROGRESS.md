@@ -127,19 +127,33 @@ RSSI ~ -92 dBm (very weak; intermittently not discovered), and on connect the
 central EARLY-DISCONNECTS during GATT service discovery (the first ACL/ATT
 round-trips). So the coex soak gets 0 stable connections / 0 notifications even
 though device-side coex is healthy (0 faults).
-Two prime suspects to fix next:
-  (A) BT RX latency/starvation — RX is a 4 ms timer poll (whd_bt_glue.c
-      bt_poll_thread, NO host-wake IRQ), and the W6 shared bus lock makes it
-      BLOCK while WHD's WLAN thread holds the bus. Fix: host-wake-IRQ-driven BT
-      RX + BT-first arbitration (mirror georgerobotics §2.3). NB WHD owns the
-      shared host-wake IRQ on GP24 (airoc_whd_hal_spi.c whd_bus_spi_irq_*) — BT
-      must hook/share it. Start here.
-  (B) Weak RSSI (-92) — possible BT TX-power / WiFi+BT coex-arbitration config
-      that the georgerobotics cyw43_ll path applied and WHD bring-up does not
-      (same antenna+BT fw gave strong links + 6073 notif in the georgerobotics
-      soak). Investigate after (A).
+  (A) BT RX latency — DONE/RULED OUT as the cause. Implemented host-wake-IRQ-
+      driven BT RX: whd_bt_glue.c bt_poll_thread now waits on bt_irq_sem
+      (k_sem) kicked from WHD's shared GP24 host-wake ISR (durable airoc patch
+      calls whd_bt_notify_irq), priority raised to PREEMPT(2), 20 ms fallback.
+      Build+flash+test: STILL early-disconnects during service discovery. So RX
+      latency was not the (sole) cause. Kept anyway (correct, lower-latency).
+  (B) Weak RSSI (-92) — now the PRIME suspect (marginal RF link). When the
+      central does find the peripheral it is always ~-92 dBm (abnormal for a
+      bench device; georgerobotics on the SAME antenna+BT fw gave strong links +
+      6073 notif). At -92 discovery is intermittent and connections drop. Likely
+      a BT TX-power / PA / init-config step the georgerobotics cyw43_ll+cybt
+      bring-up does that whd_bt_glue.c's cybt-only bring-up omits.
+
+NEXT (resume here): chase the weak-BT-signal root cause.
+  1. Decouple BLE-peripheral start from WiFi autoconnect in app/src/main.c — the
+     app currently gates ble_peripheral start behind the WiFi-connect path, so
+     `-DCONFIG_APP_WIFI_AUTOCONNECT=n` ALSO disables advertising (made the
+     WiFi-idle discriminator inconclusive). Fix so BT can be tested with WiFi
+     fully idle.
+  2. Compare the georgerobotics BT bring-up (cyw43_ll.c BT path + cybt) vs
+     whd_bt_glue.c for any TX-power / PA / coex / regulator config or HCI VSC
+     that georgerobotics issues and the WHD path skips. The combined BT blob is
+     identical, so the delta is in init, not firmware.
+  3. Consider an HCI Tx-power VSC or BT coex-config write at bt bring-up.
 This blocks W4's notification baseline and W6's 2 h gate. Builds: build_whd
-(BT_SHELL, manual diag) and build_whd_soak (auto peripheral).
+(BT_SHELL, manual diag) and build_whd_soak (auto peripheral). Both build green;
+device-side coex (WiFi+BT, 0 faults) is unaffected.
 
 ## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
 ROOT CAUSE: I_HMB_FC_CHANGE (the BT "data ready" interrupt flag in
