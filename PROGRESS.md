@@ -132,7 +132,19 @@ INTERMITTENT.
   A. COEX FIXED + PROVEN UNDER LOAD (btc_mode patch): when BT comes up it is
      strong (-67/-71/-74 dBm = georgerobotics) and SUSTAINS 593-594 notif/60s @
      9.9/s under WiFi load, 0 faults.
-  B. REMAINING — WHD BT bring-up is a DETERMINISTIC PER-BOOT ALTERNATION (~50%),
+  B. RESOLVED-AS-HARNESS-ARTIFACT (2026-06-20, operator USB power-cycle): the BT
+     bring-up "intermittency" is an SWD/WARM-RESET artifact, NOT a cold-boot/product
+     defect. After a true power-cycle, the cold boot brings BT up WORKING (-79 dBm,
+     no SWD reset); each subsequent openocd `reset run` then toggles it (F,T,F,T).
+     So a power-on boot is clean; the per-cycle SWD reset in the soak/btrate harness
+     caused the ~50% alternation. FIX for the soak: reset-UNTIL-BT-discoverable
+     (deterministic, <=1 extra reset) or power-cycle. The W6 long soak now uses this
+     (/tmp/longsoak.sh: reset-until-discoverable, then one long connection, no
+     further reset). OPEN: whether a production software/watchdog warm reboot also
+     hits the toggle (resembles SWD reset more than cold boot) — a robustness
+     follow-up, not a coex blocker.
+
+  (historical) REMAINING — WHD BT bring-up is a DETERMINISTIC PER-BOOT ALTERNATION (~50%),
      not a random ~2/3. Characterized 2026-06-20 (artifact
      docs/artifacts/w4_whd_bt_bringup_alternation_20260620.log):
        - BT is discoverable on every OTHER SWD reset: perfect F,T,F,T,... across

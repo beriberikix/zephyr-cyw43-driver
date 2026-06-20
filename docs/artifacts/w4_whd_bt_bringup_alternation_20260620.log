@@ -32,3 +32,18 @@ timing is CONCLUSIVELY ruled out and the toggle is deeper than chip power-down.
 => Root fix likely needs a true USB power-cycle test (operator) to confirm whether
    even that breaks it. Practical unblock = harness reset-until-BT-discoverable
    (deterministic alternation => at most 1 extra reset to land in the working state).
+
+## DECISIVE (operator USB power-cycle, 2026-06-20): the alternation is an
+## SWD/WARM-RESET artifact, NOT a cold-boot/product defect.
+After a true USB power-cycle:
+  - Cold boot (power-on, NO SWD reset): BT discoverable = True (-79 dBm).
+  - Then SWD resets STILL alternate from there: F,T,F,T,F,T,F,T (4/8).
+=> A true power-on cold boot brings BT up WORKING. Each openocd `reset run` (warm
+   reset) is what toggles the BT-core state; a power-cycle clears it but the next
+   warm reset re-introduces it. So in PRODUCTION (power-on boot, no SWD reset) WHD
+   BT comes up clean; the ~50% "intermittency" was the per-cycle SWD reset in the
+   soak/btrate harness.
+IMPLICATION: W4/W6 soak just needs to NOT rely on SWD warm-reset for a clean BT
+boot — power-cycle, or reset-UNTIL-BT-discoverable (deterministic: <=1 extra
+reset). Open: whether a software/watchdog warm reboot in production also hits the
+toggle (a warm reboot resembles the SWD reset more than a cold boot).
