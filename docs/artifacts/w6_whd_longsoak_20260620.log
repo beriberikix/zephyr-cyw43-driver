@@ -60,3 +60,17 @@ artifact: /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/t
 - The ~102s drop is a link-management disconnect (host BlueZ / supervision /
   param-update), to root-cause next: re-run no-WiFi-load (isolate coex vs host),
   and capture the device-side "disconnected (reason 0xXX)".
+
+## LOAD-SCALING (2026-06-20): the ~101s drop is LOAD-RATE dependent, not a timer
+  - no WiFi load:                                  300s PASS, 2963 notif, ALIVE
+  - HALF load (dev ping 2s + host ping 4s):        300s PASS, 2962 notif, ALIVE
+  - MODERATE load (dev ping 1s + host ping 2s):    ~101s DROP (102.3s / 101.1s),
+                                                   run2 end-state FAULT
+  DHCP ruled out (lease 14400s / renew 7200s, not ~101s). So it is a
+  coex-arbitration limit that accumulates with WiFi load. georgerobotics held a
+  HEAVIER load (host ping 0.5s = 2/s) for 6073 notif, so WHD coex-arbitration is
+  still WEAKER than georgerobotics under sustained load.
+  PRIME FIX CANDIDATE (now testable — chip works post btc_mode fix + cold boot):
+  BT-first poll priority. WHD WLAN thread + AIROC event task run at prio 4; the BT
+  RX poll is prio 8 (BELOW them), so heavy WiFi preempts BT RX -> eventual drop.
+  Re-test BT_POLL_PRIO PREEMPT(2) under the moderate load that drops at 101s.
