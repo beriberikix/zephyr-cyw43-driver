@@ -5,11 +5,11 @@ if(CONFIG_WIFI_ZEPHYR_CYW43)
 
   # Transport backend: georgerobotics cyw43_ll (proven default) vs WHD port.
   #
-  # The Zephyr glue (zephyr_cyw43_drv.c + aux drivers) currently calls
-  # georgerobotics cyw43_* symbols directly, so it builds only under that
-  # backend. The shared-arbitration-core extraction (so WHD reuses the poll
-  # thread + bus lock) lands with BT arbitration in W3; until then the WHD
-  # backend provides its own glue under src/whd.
+  # The Zephyr glue (zephyr_cyw43_drv.c + aux drivers) calls georgerobotics
+  # cyw43_* symbols directly, so it builds only under that backend. The
+  # shared-arbitration-core extraction (so WHD reuses the poll thread + bus
+  # lock) is future work; for now the WHD backend provides its own glue under
+  # src/whd (WiFi via the upstream AIROC driver, BT via whd_bt_glue.c).
   if(CONFIG_CYW43_TRANSPORT_GEORGEROBOTICS)
     zephyr_library_sources(
       src/zephyr_cyw43_drv.c
@@ -36,19 +36,20 @@ if(CONFIG_WIFI_ZEPHYR_CYW43)
     endif()
   elseif(CONFIG_CYW43_TRANSPORT_WHD)
     # WHD WiFi is provided by the upstream AIROC driver (CONFIG_WIFI_AIROC)
-    # over the board's stock infineon,airoc-wifi node; this module's only WHD
-    # sources are the SEAM-1 BT primitive shims (W3+).
+    # over the board's stock infineon,airoc-wifi node. src/whd holds the
+    # SEAM-1 BT glue (whd_bt_glue.c) that runs cybt over the WHD bus.
     add_subdirectory(src/whd)
   endif()
 
-  # BT HCI transport over the shared gSPI bus. Only the georgerobotics backend
-  # provides the cyw43_bluetooth_hci_* primitives today; BT-over-WHD (the cybt
-  # transport re-arbitrated onto the WHD lock) lands in W3. Until then the WHD
-  # backend builds WiFi-only even when CONFIG_BT is set.
-  if(CONFIG_CYW43_TRANSPORT_GEORGEROBOTICS)
+  # BT HCI transport over the shared gSPI bus — common to BOTH backends.
+  # The HCI driver (zephyr_cyw43_bt_hci_drv.c) + pico-sdk cybt_shared_bus are
+  # transport-agnostic: their lower edge (cyw43_bluetooth_hci_* + the backplane
+  # primitives + the bus lock) is supplied by cyw43_ctrl.c/cyw43_ll.c under the
+  # georgerobotics backend, or by src/whd/whd_bt_glue.c under the WHD backend.
+  if(CONFIG_BT)
     set(rp2_shared_bus_dir ${ZEPHYR_HAL_RPI_PICO_MODULE_DIR}/src/rp2_common/pico_cyw43_driver/cybt_shared_bus)
-    zephyr_library_include_directories_ifdef(CONFIG_BT ${rp2_shared_bus_dir}/)
-    zephyr_library_sources_ifdef(CONFIG_BT src/zephyr_cyw43_bt_hci_drv.c
+    zephyr_library_include_directories(${rp2_shared_bus_dir}/)
+    zephyr_library_sources(src/zephyr_cyw43_bt_hci_drv.c
       ${rp2_shared_bus_dir}/cybt_shared_bus.c
       ${rp2_shared_bus_dir}/cybt_shared_bus_driver.c
     )

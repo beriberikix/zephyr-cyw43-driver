@@ -69,7 +69,7 @@ choice keeps the proven stack as default/fallback; the whole matrix stays green 
 | W0 | Transport switch (Kconfig choice + guarded CMake WHD branch) + §1 EULA-blob lift + this section + blob fetch; build matrix green + georgerobotics boot smoke | VERIFIED | docs/artifacts/w0_kconfig_matrix_20260619.log — georgerobotics {wifi+bt, wifi-only} + WHD wifi-only all link green; georgerobotics boots to idle (gdb, not arch_system_halt); 43439A0.bin (249KB)+clm fetched. WHD+BT deferred to W3 (BT host needs the HCI device → `undefined reference __device_dts_ord_82`). |
 | W1 | WHD WiFi-only scan (whd_init/attach/wifi_on/scan over PIO-SPI Zephyr device; resolves R1) | VERIFIED | docs/artifacts/w1_whd_scan_20260619.log — upstream AIROC driver scanned real APs (jberi_hil, funrun, 819 Paramount…) over the RP2350 PIO-SPI, "Scan request done". R1 RESOLVED: WHD's whd_bus_spi_transfer works via spi_transceive_dt (SPI_HALF_DUPLEX, spi-data-irq-shared GP24). Matrix green: WHD 13.72% / geo wifi+bt 14.16% / geo wifi-only 12.14%. |
 | W2 | WHD associate + DHCP via Zephyr net L2 (mirror airoc_wifi.c) | VERIFIED | docs/artifacts/w2_whd_assoc_dhcp_20260619.log — WHD 3.3.3.26653, STA assoc to funrun (State COMPLETED, WPA2-PSK, RSSI -48), DHCP 192.168.4.28, ping 8.8.8.8 3/3 0% loss. (W1's early-boot join failure was transient; clean reset associates.) |
-| W3 | BT-only bring-up over WHD-arbitrated bus; SEAM-1 primitives; BD_ADDR=MAC+1 | TODO | (pending) w3_whd_bt_bringup, w3_bdaddr_10boots |
+| W3 | BT-only bring-up over WHD-arbitrated bus; SEAM-1 primitives; BD_ADDR=MAC+1 | VERIFIED | docs/artifacts/w3_whd_bt_bringup_20260619.log + test/coex/results/w3_whd_bdaddr_10boots_20260619.log — whd_bt_glue.c runs cybt over WHD backplane; bt init OK (BD_ADDR 88:A2:9E:D1:6D:A0 = MAC+1, HCI 5.2 Infineon), advertising started, BD_ADDR STABLE across 10 cold boots. Matrix green WHD+BT 15.57%. DEFERRED to W4/W6: BT bus lock is BT-local (not yet shared with WHD WLAN thread) — a concurrent whd_wifi_join failed once during bt init (contention signal); BT RX is a 4ms poll (no host-wake IRQ hook). |
 | W4 | Coexistence parity — unchanged soak.sh/rx_stress.sh/ble_central.py; BT survives wifi disconnect | TODO | (pending) w4_whd_coex_soak |
 | W5 | Init/power-order matrix (BT-only / WiFi→BT / BT→WiFi) + WiFi-only WHD build | TODO | (pending) w5_whd_initorder |
 | W6 | §2.7 fix: BT ring-index read via WHD F1-overflow-aware path (durable hal_rpi_pico patch); full 2 h soak zero faults | TODO | (pending) w6_soak_2h_clean |
@@ -102,6 +102,24 @@ west build -p always -b rpi_pico2/rp2350a/m33/w -d build_pico2 app \
 west build -p always -b rpi_pico2/rp2350a/m33/w -d build_wifionly app \
   -- -DEXTRA_CONF_FILE="$PWD/app/local.conf" -DCONFIG_BT=n
 ```
+
+BT-over-WHD seam (W3): there is no AIROC gSPI BT transport upstream, so the BT
+side KEEPS pico-sdk cybt_shared_bus and the existing bt_hci driver (both built
+in WHD mode too). Their only georgerobotics coupling is a 4-function backplane
+seam + a bus lock + cyw43_state, all provided by src/whd/whd_bt_glue.c:
+  cyw43_ll_{read,write}_backplane_reg -> whd_bus_{read,write}_backplane_value
+  cyw43_ll_{read,write}_backplane_mem -> whd_bus_transfer_backplane_bytes
+  cyw43_thread_enter/exit             -> recursive BT bus mutex (BT-local)
+  cyw43_state.mac                     -> whd_wifi_get_mac_address (BD_ADDR=MAC+1)
+  + a 4 ms BT RX poll thread (no cyw43 poll thread in WHD mode)
+WHD handle via airoc_wifi_get_whd_interface()->whd_driver (whd_int.h).
+
+W6 CRUX (carried from W3): the BT bus lock is BT-LOCAL — it serializes cybt's
+own read-modify-write sequences but NOT against WHD's WLAN bus thread
+(airoc_whd_hal_spi.c has no mutex; WHD serializes via its single whd_thread).
+Under concurrent WiFi+BT bus traffic this is the §2.7 corruption path. W4
+characterizes it; W6 fixes it (a lock BOTH the WLAN path and BT take, and/or the
+F1-overflow-aware backplane read — which WHD's whd_bus path already has).
 
 ## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
 ROOT CAUSE: I_HMB_FC_CHANGE (the BT "data ready" interrupt flag in

@@ -13,11 +13,12 @@
  * CS=GP25, CLK=GP29, SIO/host-wake=GP24 (shared, half-duplex), REG_ON=GP23.
  */
 
-/* W1 is WiFi-only; the georgerobotics board overlay's bt_hci chosen points at
- * a node we are about to delete — drop it to avoid a dangling phandle. */
+/* W3+: BT-over-WHD. Point the BT host at the cyw43 HCI driver (infineon,cyw43-bt-hci),
+ * whose transport now runs over WHD (drivers/wifi/zephyr_cyw43/src/whd/whd_bt_glue.c).
+ * The node is recreated below under the restored pio0_spi0. */
 / {
 	chosen {
-		/delete-property/ zephyr,bt_hci;
+		zephyr,bt_hci = &cyw43_bt_hci;
 	};
 };
 
@@ -61,6 +62,11 @@
 				gpio-controller;
 				#gpio-cells = <2>;
 				ngpios = <3>;
+			};
+
+			/* BT HCI transport — cybt_shared_bus driven over WHD. */
+			cyw43_bt_hci: cyw43_bt_hci {
+				compatible = "infineon,cyw43-bt-hci";
 			};
 		};
 	};
