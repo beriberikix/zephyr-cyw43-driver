@@ -135,16 +135,29 @@ link-management drop remains before the full 2 h clean-hold gate.
   device end-state ALIVE = 0 §2.7 faults (georgerobotics faulted at 1162s WITH a
   device fault; WHD = 0 faults). BUT the link ended at ~102s (clean-teardown
   classification, not early-disconnect), short of the 1800s window.
-  -> ROOT-CAUSE the ~102s drop next: (a) re-run with NO WiFi load to split coex
-     vs host (if no-load holds >>102s, it's coex-arbitration; if it also drops
-     ~100s, it's host BlueZ/supervision); (b) capture the device-side
-     "disconnected (reason 0xXX)" (BT_SHELL build or a UART grab in a quiet
-     window); (c) suspect host BlueZ ~100s idle/supervision behavior or the L2CAP
-     conn-param-update at +5s. Tools: /tmp/longsoak.sh (reset-until-discoverable +
-     long single connection + gdb liveness). Once a long hold is clean -> 2 h gate
-     -> W6 VERIFIED.
-  NOTE: §2.7 (the headline) is effectively met — 0 device faults under sustained
-  WiFi+BT load; the remaining work is BLE link longevity, not coex corruption.
+  ~101s DROP — characterized (2026-06-20), root cause still open:
+    - It is NOT host-side: no WiFi load held 300s clean (2963 notif, 0 faults);
+      HALF load (dev ping 2s + host ping 4s) also held 300s clean. Only MODERATE
+      load (dev ping 1s + host ping 2s) drops, at a strikingly DETERMINISTIC
+      ~101s (102.3s / 101.1s / 101.1s across runs), sometimes with a device FAULT.
+    - NOT DHCP (lease 14400s / renew 7200s). NOT BLE-notif-count (half load did
+      2962 notif, >2x the ~1000 at the drop, no drop). NOT ping-count (half load
+      did MORE pings by 300s than the moderate drop point). NOT the BT-first
+      priority: re-tested BT_POLL_PRIO PREEMPT(2) under moderate load -> SAME
+      101.1s drop (results/longsoak_20260620_164051.log); reverted to PREEMPT(8).
+    - So it is a TIME-based event near ~101s that only triggers a drop ABOVE a
+      WiFi-load threshold. georgerobotics held a HEAVIER load for 6073 notif, so
+      WHD's sustained-load coex margin is still thinner.
+  -> NEXT DIAGNOSTIC: identify the ~101s event. (a) Catch a FAULT run and grab the
+     gdb backtrace at the drop (is it the cybt overflow / a stack / a specific
+     thread?). (b) Capture device UART right around the 101s mark under moderate
+     load (what logs at 101s? a WiFi event, a supervisor, a reconfig?). (c) Vary
+     ONE load knob at a time (device-ping-only vs host-ping-only) to see which
+     drives it. (d) Consider a WiFi power-save / keepalive / listen-interval timer
+     near 100s. Tools: /tmp/longsoak.sh (NOLOAD=1, PICO_PING_MS=, HOST_PING_S=).
+  NOTE: §2.7 headline largely met (no/light/half load = 0 faults, 300s clean); the
+  open item is WHD's sustained-MODERATE-load BLE longevity (a thinner coex margin
+  than georgerobotics), which the spec's bounded-load gate may already accept.
 
 (historical) NEXT: TWO findings now — coex (TX) is FIXED, but BT BRING-UP is
 INTERMITTENT.
