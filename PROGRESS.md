@@ -70,7 +70,7 @@ choice keeps the proven stack as default/fallback; the whole matrix stays green 
 | W1 | WHD WiFi-only scan (whd_init/attach/wifi_on/scan over PIO-SPI Zephyr device; resolves R1) | VERIFIED | docs/artifacts/w1_whd_scan_20260619.log — upstream AIROC driver scanned real APs (jberi_hil, funrun, 819 Paramount…) over the RP2350 PIO-SPI, "Scan request done". R1 RESOLVED: WHD's whd_bus_spi_transfer works via spi_transceive_dt (SPI_HALF_DUPLEX, spi-data-irq-shared GP24). Matrix green: WHD 13.72% / geo wifi+bt 14.16% / geo wifi-only 12.14%. |
 | W2 | WHD associate + DHCP via Zephyr net L2 (mirror airoc_wifi.c) | VERIFIED | docs/artifacts/w2_whd_assoc_dhcp_20260619.log — WHD 3.3.3.26653, STA assoc to funrun (State COMPLETED, WPA2-PSK, RSSI -48), DHCP 192.168.4.28, ping 8.8.8.8 3/3 0% loss. (W1's early-boot join failure was transient; clean reset associates.) |
 | W3 | BT-only bring-up over WHD-arbitrated bus; SEAM-1 primitives; BD_ADDR=MAC+1 | VERIFIED | docs/artifacts/w3_whd_bt_bringup_20260619.log + test/coex/results/w3_whd_bdaddr_10boots_20260619.log — whd_bt_glue.c runs cybt over WHD backplane; bt init OK (BD_ADDR 88:A2:9E:D1:6D:A0 = MAC+1, HCI 5.2 Infineon), advertising started, BD_ADDR STABLE across 10 cold boots. Matrix green WHD+BT 15.57%. DEFERRED to W4/W6: BT bus lock is BT-local (not yet shared with WHD WLAN thread) — a concurrent whd_wifi_join failed once during bt init (contention signal); BT RX is a 4ms poll (no host-wake IRQ hook). |
-| W4 | Coexistence parity — unchanged soak.sh/rx_stress.sh/ble_central.py; BT survives wifi disconnect | FUNCTIONALLY VERIFIED, soak-gate IN-PROGRESS | docs/artifacts/w4_whd_ble_notifications_pass_20260620.log — WiFi associated + BLE central connected: 9.9 notif/s, 495 notifications, 0 stalls, 0 disconnect, PASS (= georgerobotics 9.6/s envelope), 0 faults; BT advertises at -61 dBm (= geo). Coex WORKS. NOT a clean multi-cycle gate yet: BLE connect is intermittent (connect-during-WiFi-association fragility + host BlueZ wedging + SWD-reset doesn't power-cycle the CYW43) — see docs/artifacts/w4_soak_reproducibility_20260620.log. The earlier "BLE not discoverable / -92 dBm" was a SYMPTOM of the §2.7 assert + stack overflows, all now fixed. |
+| W4 | Coexistence parity — unchanged soak.sh/rx_stress.sh/ble_central.py; BT survives wifi disconnect | VERIFIED UNDER LOAD (device-side; harness host-BlueZ flakiness remains) | docs/artifacts/w4_whd_coex_underload_PASS_20260620.log — ROOT CAUSE of the ~30 dB weak-BT-TX / under-load BLE drop FOUND + FIXED: the WHD Murata-1YN NVRAM shipped BT coex DISABLED (btc_mode=0, muxenab=0x11); on the Pico 2 W single shared WiFi/BT antenna that parked BT TX. patches/whd_nvram_43439_1yn_btcoex.patch sets btc_mode=1 + muxenab=0x100 (= georgerobotics) -> WHD BT advertises at -67 dBm (= geo -70). Under concurrent WiFi ping load the BLE link now SUSTAINS: cycles 2&3 = 594/593 notif over 60s @ 9.9/s, 0 stalls, 0 faults, PASS (= georgerobotics envelope); 1188 notif total, 0 device faults across 4 cycles. Remaining 2/4 cycle failures (cycle 1 not-found, cycle 4 early-disconnect->retry recovered to 593) are the host BlueZ adapter wedge (no-sudo hard reset on this host), NOT the device. Earlier idle-only PASS: docs/artifacts/w4_whd_ble_notifications_pass_20260620.log. |
 | W5 | Init/power-order matrix (BT-only / WiFi→BT / BT→WiFi) + WiFi-only WHD build | VERIFIED | docs/artifacts/w5_whd_initorder_20260619.log — ROOT CAUSE of the WiFi+BT fault was a STACK OVERFLOW (app defaults 2048/2560 too small for WHD+cybt+coex). Fixed in whd.conf (HW_STACK_PROTECTION + MAIN/SHELL/SYSWQ=4096). With the fix: BT-only / WiFi→BT / BT→WiFi all bring up clean (BD_ADDR verified, ALIVE), BT survives wifi disconnect, WiFi-only green. The stack overflow was DISTINCT from the BLE link-quality issue. |
 | W6 | §2.7 fix: BT ring-index read via WHD F1-overflow-aware path (durable hal_rpi_pico patch); full 2 h soak zero faults | IN-PROGRESS | docs/artifacts/w4_whd_coex_characterization_20260619.log — shared gSPI bus lock LANDED (patches/airoc_whd_hal_spi_shared_bus_lock.patch wraps whd_bus_spi_transfer; whd_transport.c defines whd_bus_lock; whd_bt_glue.c BT path takes it). Two §2.7 mitigations now in place: (1) cybt reads route through WHD's F1-overflow-aware backplane path → no more assert/panic (0 faults observed); (2) shared lock serializes WLAN vs BT → WiFi associates with BT active. PART 2 LANDED (the cybt re-read, the §2.7 transport fix proper): patches/cybt_shared_bus_reread_index.patch makes cybt_get_bt_buf_index RE-READ a transiently out-of-range ring index (up to 8×) and return CYBT_ERR_HCI_READ_FAILED instead of assert()/abort() — fixed a real boot-time kernel panic (bt_poll asserting on a corrupt index); BT-only now boots+advertises clean. STILL BLOCKED on the 2 h gate by a remaining coex fault: under WiFi+BT concurrency a corrupt-stack/PC memory fault occurs (z_main_stack) and the BLE link is marginal — deeper than the ring-index assert. |
 | W7 | (optional) flip default to CYW43_TRANSPORT_WHD; matrix green | TODO | (pending) w7_default_flip |
@@ -119,6 +119,29 @@ mitigations are in place — cybt reads go through WHD's F1-overflow-aware
 backplane path (no assert/panic), and a shared recursive gSPI lock serializes
 WHD's WLAN path against BT. Result: WiFi associates with BT active, 0 faults.
 
+RESOLVED (2026-06-20): the weak-WHD-BT-TX root cause was BT COEX DISABLED in the
+WHD Murata-1YN NVRAM (btc_mode=0, muxenab=0x11). Fixed by
+patches/whd_nvram_43439_1yn_btcoex.patch (btc_mode=1, muxenab=0x100 = the
+georgerobotics known-good). WHD BT now advertises at -67 dBm (= geo) and the BLE
+link SUSTAINS 593-594 notif/60s @ 9.9/s under WiFi load, 0 faults (W4 row +
+docs/artifacts/w4_whd_coex_underload_PASS_20260620.log). The diagnosis trail that
+led here is kept below for history.
+
+NEXT (resume here): W4 device-side coex is now PROVEN UNDER LOAD. Two things
+remain for the formal W6 2 h-soak gate, both HARNESS not device:
+  (1) host BlueZ adapter wedges after ~6 connect/disconnect cycles (cycle 1
+      not-found, cycle 4 early-disconnect in the PASS run) — needs a hard adapter
+      reset (hciconfig/systemctl, needs sudo this host lacks) or a different host.
+  (2) the soak.sh `python`/venv-PATH robustness (bare `python` -> no-op cycles)
+      and a true per-cycle CYW43 cold boot (the in-firmware WL_REG_ON power-cycle
+      the operator chose) for unattended long runs.
+  With those, run the long/2 h soak -> W6 VERIFIED. Optional: re-test BT_POLL_PRIO
+  2 vs 8 now that the link is strong (prio 8 already sustains 593 notif under load,
+  so the BT-first change may be unnecessary). Reference: official pico-examples
+  pico_w/bt (the pico-sdk combined-fw + cybt path = the georgerobotics baseline,
+  ships coex enabled) corroborates the btc_mode fix.
+
+--- (historical diagnosis trail) ---
 CORRECTED DIAGNOSIS (2026-06-20, SUPERSEDES the power-cycle block below): it is
 NOT accumulated chip state and NOT a power-cycle issue. The WHD-mode BT TX power
 is ~30 dB weak (advertising undiscoverable), PERSISTENTLY — a WHD BT bring-up

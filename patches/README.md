@@ -59,3 +59,29 @@ git apply <this-repo>/patches/cybt_shared_bus_reread_index.patch
 
 NB this file is compiled by BOTH transports (it is the shared BT bus driver), so
 the re-read hardening benefits the georgerobotics backend too.
+
+## whd_nvram_43439_1yn_btcoex.patch
+
+**Target:** `modules/hal/infineon/whd-expansion/WHD/COMPONENT_WIFI5/resources/nvram/COMPONENT_43439/COMPONENT_MURATA-1YN/cyfmac43439-1YN.txt`
+(the WHD WiFi NVRAM for the Murata 1YN module = Pico 2 W, in the `hal_infineon`
+west module — selected by `CONFIG_CYW43439_MURATA_1YN`).
+
+**Why (W4, the BT TX-power fix):** the stock WHD Murata-1YN NVRAM ships with BT
+coexistence **disabled** (`btc_mode=0`, `muxenab=0x11`). The CYW43439 on the
+Pico 2 W has ONE shared WiFi/BT antenna, so with coex off the BT radio cannot
+arbitrate antenna access and its TX is parked — BLE advertising came out ~30 dB
+weak (RSSI ~-92 / undiscoverable), which dropped every BLE link under WiFi load.
+The georgerobotics stack runs `btc_mode=1` + `muxenab=0x100` and its BT is
+healthy (-70 dBm) on the same chip. This patch matches that known-good coex
+config (`btc_mode=0`→`1`, `muxenab=0x11`→`0x100`); WHD BT then advertises at
+-67 dBm (= georgerobotics). Root-caused via a same-bench georgerobotics-vs-WHD
+A/B (docs/artifacts/w4_btx_geo_vs_whd_discriminator_20260620.log).
+
+**Apply:**
+```
+cd <west-topdir>/modules/hal/infineon
+git apply <this-repo>/patches/whd_nvram_43439_1yn_btcoex.patch
+```
+**Verify:** `grep -nE 'btc_mode|muxenab' <...>/COMPONENT_MURATA-1YN/cyfmac43439-1YN.txt`
+should show `muxenab=0x100` and `btc_mode=1`. Rebuild with `-p always` (the NVRAM
+size is captured at CMake configure time).
