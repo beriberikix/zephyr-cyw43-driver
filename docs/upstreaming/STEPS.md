@@ -26,9 +26,12 @@ Cross-references: `RFC.md`, `track-A-zephyr-airoc-leakfix.md`,
       `RFC: WiFi+BT coexistence over the WHD gSPI bus for CYW43439 (Pico 2 W)`.
 - [ ] Paste the body of `docs/upstreaming/RFC.md` (everything below its title;
       skip the leading HTML comment).
-- [ ] Post a short heads-up to **devel@lists.zephyrproject.org** linking the issue
-      (the guidelines ask for a conversation before large features).
 - [ ] Note the issue number as `<RFC#>` and use it in later PRs.
+- [ ] Announce it on Discord — **`#raspberrypi`** and **`#infineon`** only (the
+      vendor channels) — using the two hooks in
+      `docs/upstreaming/discord-announcement.md`, with the issue link filled in.
+      The GitHub issue is canonical (BT/WiFi maintainers engage there via the RFC
+      label + MAINTAINERS); no `#bt-hci`/`#wifi`/`devel@` post needed.
 - [ ] Wait for maintainer direction on: BT-HCI transport home, coex-arbitration
       home, the firmware-blob path. (Tracks A/B can proceed in parallel.)
 

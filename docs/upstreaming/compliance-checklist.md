@@ -12,7 +12,7 @@ submission day — re-check, it changes). Status of our material against each ru
 | **Commit title `area: summary`, ≤ 72 chars** | ✅ e.g. `drivers: wifi: airoc: free undersized net_buf in host_buffer_get`. |
 | **Commit body present, ≤ 75 chars/line, what/why/tested** | ✅ Prepared messages are wrapped and state what/why/how-tested. |
 | **`./scripts/ci/check_compliance.py -c <range>`** passes | ⚠️ Action: run locally per PR before pushing (broader than the `checkpatch` we ran during dev). |
-| **RFC issue + devel-list conversation before large features** | ✅ Track 0 (`RFC.md`) + `devel@` post. The coex feature is the "large feature"; the bug fixes (Track A/B) don't need it. |
+| **RFC issue + community conversation before large features** | ✅ Track 0 (`RFC.md`) + a Discord announce in `#raspberrypi`/`#infineon` (the vendor channels; Discord is the active channel in practice, the guideline names the `devel@` list which is optional here). The coex feature is the "large feature"; the bug fixes (Track A/B) don't need it. |
 | **Treewide change → AWG vote** | ✅ N/A — no Zephyr API/coding-practice change across the tree. (A new driver/feature is not "treewide.") |
 | **External code: `Origin:/License:/URL:/commit:` block** | ⚠️ Applies to the module (Track C): `cybt` (BSD-3-Clause, pico-sdk), the BT-fw blob. The Track-A fix is `Origin: Original` (Apache) — no block needed. |
 | **Non-Apache external component → governing-board approval** | ⛔ The **BT firmware blob** is the gated item. Raise via the RFC; do not push it upstream until the blob/governing-board path is agreed. `cybt` is BSD-3 (compatible, documentable). |
