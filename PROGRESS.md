@@ -141,15 +141,23 @@ Evidence (all this session):
     until advertising RF degrades. Only a TRUE power cycle (USB unplug/replug, or
     an in-firmware WL_REG_ON / whd_wifi_off+on deinit-reinit we do not yet have)
     recovers it. This is the soak-reproducibility blocker PROGRESS predicted.
-  -> OPERATOR ACTION NEEDED: physically power-cycle the Pico 2 W (unplug/replug
-     USB), then run `/loop` to resume. First post-power-cycle step: re-confirm a
-     fresh chip is discoverable, then A/B BT_POLL_PRIO 8 vs 2 under light load to
-     verify the BT-first fix on a clean chip.
-  -> ENGINEERING follow-up (the durable fix for reproducibility): add a true
-     per-cycle CYW43 power-cycle — a `cyw43 deinit/reinit` shell cmd or a WL_REG_ON
-     toggle in WHD mode (whd_wifi_off/whd_deinit then re-on) — so the soak resets
-     the chip each cycle instead of relying on SWD reset. Needs the chip recovered
-     first to develop against.
+  -> OPERATOR ACTION NEEDED (precise): unplug the PICO 2 W's OWN power/USB cable
+     (NOT the debug probe — the probe is a separate USB device; cycling it does
+     NOT power the Pico) for ~5 s, replug, then run `/loop`. During the last run
+     the probe re-enumerated (Device 004->010) but the chip stayed undiscoverable,
+     i.e. the Pico's power was NOT actually cycled. PREMISE CHECK first: after a
+     confirmed Pico power-cycle, re-scan — if the chip is discoverable, the
+     accumulated-state hypothesis holds and we proceed; if STILL undiscoverable,
+     the cause is deeper than accumulated chip state (revisit weak-BT-TX / RF).
+  -> ENGINEERING follow-up (operator chose this, 2026-06-20): once the premise is
+     validated, build a true in-firmware CYW43 power-cycle = toggle WL_REG_ON
+     (airoc_whd_hal_common.c already drives wifi_reg_on_gpio 0->1) + re-attach bus
+     + whd_wifi_on, and reset cyw43_state.bt_loaded so cybt reloads patchram. Expose
+     as a `cyw43 powercycle` shell cmd and call it per soak cycle. This both
+     RECOVERS the degraded chip in software (no unplug needed) AND gives the soak a
+     real per-cycle cold boot. CAUTION: WHD reinit mid-run must quiesce the net
+     device, BT host, and the bt_poll thread — non-trivial; develop carefully on a
+     recovered chip.
 
 CHANGES LANDED THIS ITERATION (unverified-as-fixing due to the block, but kept):
   - test/coex/soak.conf: relaxed the BLE link for coex — CONFIG_BT_PERIPHERAL_PREF_
