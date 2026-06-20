@@ -23,6 +23,29 @@ DEFAULT_NAME = "test-picow-bluetooth"
 
 
 async def run(args):
+    """Retry the scan->connect->measure attempt a few times so a TRANSIENT
+    establishment failure (peripheral momentarily not advertising, connect
+    timeout, or an early drop before any data) doesn't fail the whole soak
+    cycle. Genuine instability (all attempts fail) still fails. Coexistence is
+    flaky to ESTABLISH but stable once streaming (see W4 artifacts)."""
+    attempts = max(1, args.connect_retries + 1)
+    rc = 2
+    for i in range(attempts):
+        if i:
+            print(f"-- retry {i}/{args.connect_retries} after transient failure --",
+                  flush=True)
+            await asyncio.sleep(args.retry_delay)
+        try:
+            rc = await run_once(args)
+        except Exception as e:
+            print(f"attempt failed: {type(e).__name__}: {e}", flush=True)
+            rc = 3
+        if rc == 0:
+            return 0
+    return rc
+
+
+async def run_once(args):
     print(f"scanning for '{args.name}' / {args.addr} ...", flush=True)
     dev = await BleakScanner.find_device_by_filter(
         lambda d, ad: (args.addr and d.address.upper() == args.addr.upper())
@@ -98,6 +121,9 @@ def main():
     ap.add_argument("--duration", type=float, default=30)
     ap.add_argument("--scan-timeout", type=float, default=15)
     ap.add_argument("--max-gap", type=float, default=3.0)
+    ap.add_argument("--connect-retries", type=int, default=3,
+                    help="retries for a TRANSIENT scan/connect failure")
+    ap.add_argument("--retry-delay", type=float, default=3.0)
     args = ap.parse_args()
     try:
         sys.exit(asyncio.run(run(args)))

@@ -1,0 +1,6 @@
+=== characterization soak 20260620_043540  cycles=4 max_conn=60s load: pico_ping=1000ms host_ping=2s ===
+----- cycle 1/4 2026-06-20T04:35:40Z -----
+>> cycle 1: notif=1 conn=0.0s end=ALIVE disc=1
+----- cycle 2/4 2026-06-20T04:37:07Z -----
+>> cycle 2: notif=0 conn=0s end=ALIVE disc=0
+----- cycle 3/4 2026-06-20T04:39:21Z -----

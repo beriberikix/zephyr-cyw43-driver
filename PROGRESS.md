@@ -119,7 +119,29 @@ mitigations are in place — cybt reads go through WHD's F1-overflow-aware
 backplane path (no assert/panic), and a shared recursive gSPI lock serializes
 WHD's WLAN path against BT. Result: WiFi associates with BT active, 0 faults.
 
-NEXT (resume here): SOAK REPRODUCIBILITY/ROBUSTNESS for the W4 multi-cycle gate
+NEXT (resume here): BLE STABILITY UNDER CONCURRENT WiFi TRAFFIC — the real
+remaining coex gap (narrowed 2026-06-20). Findings:
+  - ble_central with retries reliably PASSes at IDLE WiFi (associated, no
+    traffic): repeatable 119/149/495 notifications, 9.9-10/s, 0 stalls, 0 faults.
+  - But under the soak's WiFi PING LOAD (even light, 1 ping/s) BLE drops:
+    soak.sh cycles give notif=1 then disconnect / notif=0
+    (results/w4_whd_coex_soak_retry_20260620.log). So coexistence is stable at
+    idle but the BLE ACL link can't survive concurrent WiFi bus traffic.
+    georgerobotics held 6073 notif under the SAME bounded load, so this is a WHD
+    coex-arbitration gap, not the load itself.
+  - Likely cause: WHD's WLAN bus thread holds the shared gSPI lock for long
+    bursts during ping TX/RX, starving the BT ACL TX/RX past the BLE connection-
+    event timing -> supervision-timeout drop. Fix direction: BT-first
+    arbitration / bound WHD's bus-hold time / raise BT RX servicing under load
+    (the georgerobotics single-poll BT-first design, REFERENCE §2.3) — and/or
+    tune the BLE connection supervision timeout / use a faster BT RX.
+  - Harness improvements already landed: ble_central.py --connect-retries (rides
+    transient establishment flakiness); soak.sh BOOT_S env-overridable.
+  - Still-open harness robustness (lower priority than the under-load fix):
+    host BlueZ wedging (needs hciconfig/systemctl reset; no passwordless sudo on
+    this host), true per-cycle CYW43 cold boot.
+
+(superseded) earlier NEXT — SOAK REPRODUCIBILITY/ROBUSTNESS:
 and the W6 2 h gate. Coexistence is FUNCTIONALLY PROVEN (ble_central PASS: 9.9/s,
 495 notif, 0 stalls, 0 faults — docs/artifacts/w4_whd_ble_notifications_pass_20260620.log).
 What remains is making it reproducible across a multi-cycle soak:
