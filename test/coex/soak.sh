@@ -34,7 +34,9 @@ HOST_PING_S="${HOST_PING_S:-0.5}"
 # cycles (notif=0/conn=0). Set HOST_BT_RESET=0 to disable.
 HOST_BT_RESET="${HOST_BT_RESET:-1}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ELF="$(cd "$HERE/../.." && pwd)/build_soak/zephyr/zephyr.elf"
+# Image under test. Env-overridable so the same harness drives the WHD soak
+# image: ELF=.../build_whd_soak/zephyr/zephyr.elf soak.sh ...
+ELF="${ELF:-$(cd "$HERE/../.." && pwd)/build_soak/zephyr/zephyr.elf}"
 OCD="$HOME/.pico-sdk/openocd/0.12.0+dev/openocd"
 OCDS="$HOME/.pico-sdk/openocd/0.12.0+dev/scripts"
 GDB="$HOME/zephyr-sdk-1.0.1/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb"

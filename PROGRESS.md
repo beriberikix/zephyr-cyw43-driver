@@ -119,7 +119,54 @@ mitigations are in place — cybt reads go through WHD's F1-overflow-aware
 backplane path (no assert/panic), and a shared recursive gSPI lock serializes
 WHD's WLAN path against BT. Result: WiFi associates with BT active, 0 faults.
 
-NEXT (resume here): BLE STABILITY UNDER CONCURRENT WiFi TRAFFIC — the real
+BLOCKED (2026-06-20, hardware-state — needs an operator power-cycle): the
+device's BT advertising has degraded to UNDISCOVERABLE after this session's many
+SWD-reset-only cycles, so the under-load fixes below cannot be cleanly measured.
+Evidence (all this session):
+  - Run #2 (early): the central FOUND + connected to the peripheral every cycle,
+    failing with EARLY DISCONNECT during GATT subscribe under light WiFi load
+    (results/soak_20260620_125411.log) — the genuine under-load gap.
+  - Run #3 + isolation (later, ~12+ cycles in): the central mostly cannot FIND
+    the peripheral at all (results/soak_20260620_131107.log).
+  - Disambiguated device vs host: the HOST adapter is healthy — an independent
+    `bleak` discover() sees 5 other BLE devices — but the Pico is NOT among them.
+    The device IS advertising: fresh-boot UART shows "BT up over WHD bus", BD_ADDR
+    88:A2:9E:D1:6D:A0 verified, "starting advertising" at 7.4 s, no error, ALIVE.
+    So the controller says it advertises but the RF is weak/absent.
+  - A/B proved this is NOT the poll-priority change: BT_POLL_PRIO PREEMPT(8) (W3
+    baseline) and PREEMPT(2) (BT-first) are BOTH undiscoverable on a fresh boot
+    with the host reset. The regression tracks CYCLE COUNT, not the code.
+  - Root cause = the known constraint: SWD `reset run` does NOT power-cycle the
+    CYW43 (WL_REG_ON stays high), so BT controller state accumulates across cycles
+    until advertising RF degrades. Only a TRUE power cycle (USB unplug/replug, or
+    an in-firmware WL_REG_ON / whd_wifi_off+on deinit-reinit we do not yet have)
+    recovers it. This is the soak-reproducibility blocker PROGRESS predicted.
+  -> OPERATOR ACTION NEEDED: physically power-cycle the Pico 2 W (unplug/replug
+     USB), then run `/loop` to resume. First post-power-cycle step: re-confirm a
+     fresh chip is discoverable, then A/B BT_POLL_PRIO 8 vs 2 under light load to
+     verify the BT-first fix on a clean chip.
+  -> ENGINEERING follow-up (the durable fix for reproducibility): add a true
+     per-cycle CYW43 power-cycle — a `cyw43 deinit/reinit` shell cmd or a WL_REG_ON
+     toggle in WHD mode (whd_wifi_off/whd_deinit then re-on) — so the soak resets
+     the chip each cycle instead of relying on SWD reset. Needs the chip recovered
+     first to develop against.
+
+CHANGES LANDED THIS ITERATION (unverified-as-fixing due to the block, but kept):
+  - test/coex/soak.conf: relaxed the BLE link for coex — CONFIG_BT_PERIPHERAL_PREF_
+    TIMEOUT 42->400 (4 s supervision timeout, was 420 ms) + CONFIG_BT_CONN_PARAM_
+    UPDATE_TIMEOUT 5000->400 (fire the L2CAP param-update early). Rationale: under
+    load the failing cycles were "notif<=1 ... end=ALIVE" = supervision-timeout
+    drop on a fault-free device. Harmless to georgerobotics (which already passes).
+  - drivers/.../whd_bt_glue.c: documented the BT-first priority inversion (WHD WLAN
+    thread + AIROC event task run at CY_RTOS_PRIORITY_HIGH = prio 4; the BT poll
+    was prio 8, BELOW them, so WiFi activity preempts BT RX). LEFT at the VERIFIED
+    PREEMPT(8) baseline pending a clean-chip A/B; PREEMPT(2) is the prime candidate.
+  - test/coex/soak.sh: ELF env-overridable so the harness drives the WHD soak image
+    (build_whd_soak). NOTE: the harness calls bare `python`; runs must put the venv
+    (../.venv/bin) on PATH or every cycle silently no-ops ("python: command not
+    found"). TODO: make soak.sh use python3/venv-robust.
+
+(superseded by the BLOCK above) NEXT: BLE STABILITY UNDER CONCURRENT WiFi TRAFFIC — the real
 remaining coex gap (narrowed 2026-06-20). Findings:
   - ble_central with retries reliably PASSes at IDLE WiFi (associated, no
     traffic): repeatable 119/149/495 notifications, 9.9-10/s, 0 stalls, 0 faults.

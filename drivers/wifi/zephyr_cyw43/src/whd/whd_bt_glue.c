@@ -130,6 +130,24 @@ extern void cyw43_bluetooth_hci_process(void);
 extern bool cyw43_bluetooth_has_pending(void);
 
 #define BT_POLL_STACK_SIZE 4096
+/* BT-first arbitration (W4/W6): the BT RX poll MUST out-prioritise WHD's WLAN
+ * threads, or concurrent WiFi traffic starves BT RX and the BLE link drops
+ * during GATT service discovery (early-disconnect under load; idle WiFi is
+ * fine). WHD runs its WLAN bus thread and the AIROC event task at
+ * CY_RTOS_PRIORITY_HIGH == NUM_PREEMPT_PRIORITIES*2/7 == prio 4 (preemptible);
+ * the old poll at PREEMPT(8) sat BELOW them, so any WiFi activity preempted the
+ * poll and delayed BT RX past the connection-event timing. Run the poll at
+ * PREEMPT(2), one band above both prio-4 WLAN threads, so a BT RX servicing
+ * always preempts WiFi RX the instant the poll's interval elapses — the same
+ * BT-first single-poll discipline the georgerobotics stack uses (REFERENCE
+ * §2.3). It still yields the shared gSPI bus via the recursive whd_bus_lock
+ * (priority inheritance lets WHD finish an in-flight transfer), so WiFi is
+ * slowed, not starved.
+ *
+ * A/B UNDER TEST: PREEMPT(8) (below the WLAN threads, the W3 baseline) vs
+ * PREEMPT(2) (above them). Toggle to isolate whether the priority affects BLE
+ * discoverability/early-disconnect under coex.
+ */
 #define BT_POLL_PRIO       K_PRIO_PREEMPT(8)
 /* Poll interval: fast enough for HCI command/event round-trips and ~10 notif/s
  * coex, slow enough not to hammer the backplane at idle. (An earlier host-wake-
