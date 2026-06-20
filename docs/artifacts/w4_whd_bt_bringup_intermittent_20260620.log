@@ -1,0 +1,16 @@
+=== WHD BT bring-up reliability after the btc_mode coex fix (2026-06-20) ===
+Clean test: SWD reset + fresh-host scan, x3 (each: reset, 13s boot, host bt
+power off/on, 9s active scan). build_whd_soak with the btc_mode coex patch.
+
+  trial 1: discoverable=True  RSSI=-71 dBm
+  trial 2: discoverable=False (BT did not come up this boot)
+  trial 3: discoverable=True  RSSI=-74 dBm
+
+=> ~2/3 of cold boots: WHD BT comes up HEALTHY (-71/-74 = georgerobotics -70).
+   ~1/3 of cold boots: WHD BT does NOT advertise at all (dead).
+INTERMITTENT bring-up, SEPARATE from the (fixed) coex/TX-power issue and from
+the host-BlueZ wedge. airoc_wifi_power_on() DOES power-cycle WL_REG_ON each
+boot (low/10ms/high/250ms), so it is a bring-up race/timing/RF issue, not a
+missing power-cycle. Candidates: WL_REG_ON discharge 10ms (geo 20ms);
+WL_RFSW_VDD antenna-switch pin geo drives + WHD may not; cybt patchram vs WHD
+WLAN-init race. See PROGRESS NEXT for the fix plan.

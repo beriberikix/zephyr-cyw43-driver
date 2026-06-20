@@ -127,19 +127,40 @@ link SUSTAINS 593-594 notif/60s @ 9.9/s under WiFi load, 0 faults (W4 row +
 docs/artifacts/w4_whd_coex_underload_PASS_20260620.log). The diagnosis trail that
 led here is kept below for history.
 
-NEXT (resume here): W4 device-side coex is now PROVEN UNDER LOAD. Two things
-remain for the formal W6 2 h-soak gate, both HARNESS not device:
-  (1) host BlueZ adapter wedges after ~6 connect/disconnect cycles (cycle 1
-      not-found, cycle 4 early-disconnect in the PASS run) — needs a hard adapter
-      reset (hciconfig/systemctl, needs sudo this host lacks) or a different host.
-  (2) the soak.sh `python`/venv-PATH robustness (bare `python` -> no-op cycles)
-      and a true per-cycle CYW43 cold boot (the in-firmware WL_REG_ON power-cycle
-      the operator chose) for unattended long runs.
-  With those, run the long/2 h soak -> W6 VERIFIED. Optional: re-test BT_POLL_PRIO
-  2 vs 8 now that the link is strong (prio 8 already sustains 593 notif under load,
-  so the BT-first change may be unnecessary). Reference: official pico-examples
-  pico_w/bt (the pico-sdk combined-fw + cybt path = the georgerobotics baseline,
-  ships coex enabled) corroborates the btc_mode fix.
+NEXT (resume here): TWO findings now — coex (TX) is FIXED, but BT BRING-UP is
+INTERMITTENT.
+  A. COEX FIXED + PROVEN UNDER LOAD (btc_mode patch): when BT comes up it is
+     strong (-67/-71/-74 dBm = georgerobotics) and SUSTAINS 593-594 notif/60s @
+     9.9/s under WiFi load, 0 faults.
+  B. REMAINING — intermittent WHD BT bring-up (~2/3 of boots): a clean
+     reset+scan x3 with a freshly-reset host gave discoverable / NOT / discoverable
+     (-71, dead, -74). So ~1/3 of cold boots the BT does NOT come up at all (dead
+     advertising); the other ~2/3 it is healthy. This is SEPARATE from the
+     (now-fixed) TX-power/coex issue and from the host-BlueZ wedge. It is what made
+     this session's later soak cycles flaky (cycle1 not-found, 30-min run found-on-
+     retry-then-0-notif). NOTE: airoc_wifi_power_on() DOES power-cycle WL_REG_ON
+     (low, 10 ms discharge, high, 250 ms) every boot, so it is NOT a missing
+     power-cycle — it is a bring-up race/timing/RF issue.
+     CANDIDATE CAUSES to chase next (cheapest first):
+       1. WL_REG_ON off-time: AIROC WLAN_CBUCK_DISCHARGE_MS=10 ms vs georgerobotics
+          20 ms (cyw43_ctrl.c:161-163). Too-short discharge can leave chip state ->
+          flaky cold start. Bump to 20 ms (patch airoc_whd_hal_common.h) + measure
+          the discoverability rate over N resets.
+       2. WL_RFSW_VDD antenna-switch pin: georgerobotics drives CYW43_PIN_WL_RFSW_VDD
+          low at off / high at on (cyw43_ctrl.c:91,469). Check whether the AIROC DT
+          node / driver manages the Pico 2 W RF-switch pin at all; if not, BT TX may
+          be intermittently mis-routed on the shared antenna.
+       3. cybt patchram vs WHD WLAN-init race: whd_bt_ensure_up() loads BT patchram
+          lazily on first BT op (bt_enable at boot) while WHD WiFi may be mid-assoc;
+          despite the shared bus lock the BT core may not always come up. Try
+          gating BT bring-up until WHD WiFi reports up, or a post-patchram BT
+          readiness check + retry.
+  C. HARNESS (for the unattended 2 h gate, both already understood): host BlueZ
+     wedge needs a hard adapter reset (sudo/another host); soak.sh python-robustness
+     is now landed. A single sustained connection avoids the host wedge.
+  -> Measure-and-fix B first (it gates everything); then the long/2 h soak -> W6.
+  Reference: official pico-examples pico_w/bt (pico-sdk combined-fw + cybt =
+  georgerobotics baseline, ships coex enabled) corroborates the btc_mode fix.
 
 --- (historical diagnosis trail) ---
 CORRECTED DIAGNOSIS (2026-06-20, SUPERSEDES the power-cycle block below): it is
