@@ -34,6 +34,15 @@ HOST_PING_S="${HOST_PING_S:-0.5}"
 # cycles (notif=0/conn=0). Set HOST_BT_RESET=0 to disable.
 HOST_BT_RESET="${HOST_BT_RESET:-1}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# Robust python: prefer an explicit $PYTHON, else the workspace venv (which has
+# bleak/pyserial), else python3, else python. A bare `python` is NOT on PATH on
+# this host, and if unresolved every cycle silently no-ops (no load, no central).
+if [ -z "${PYTHON:-}" ]; then
+	if [ -x "$HERE/../../../.venv/bin/python" ]; then
+		PYTHON="$(cd "$HERE/../../../.venv/bin" && pwd)/python"
+	elif command -v python3 >/dev/null 2>&1; then PYTHON=python3
+	else PYTHON=python; fi
+fi
 # Image under test. Env-overridable so the same harness drives the WHD soak
 # image: ELF=.../build_whd_soak/zephyr/zephyr.elf soak.sh ...
 ELF="${ELF:-$(cd "$HERE/../.." && pwd)/build_soak/zephyr/zephyr.elf}"
@@ -77,12 +86,12 @@ for c in $(seq 1 "$CYCLES"); do
 	ocd_reset
 	sleep "$BOOT_S"
 	# WiFi load: Pico -> internet (fire-and-forget; runs on the device shell)
-	python "$HERE/console.py" send "net ping -c 1000000 -i $PICO_PING_MS 8.8.8.8" --wait 1 >>"$LOG" 2>&1
+	"$PYTHON" "$HERE/console.py" send "net ping -c 1000000 -i $PICO_PING_MS 8.8.8.8" --wait 1 >>"$LOG" 2>&1
 	# WiFi load: host -> Pico (background)
 	( ping -i "$HOST_PING_S" "$PICO_IP" >/tmp/soak_hostping.txt 2>&1 ) &
 	hp=$!
 	# BLE central: connect + subscribe + measure until disconnect or window.
-	creport="$(timeout $((MAX_CONN_S + 40)) python "$HERE/ble_central.py" \
+	creport="$(timeout $((MAX_CONN_S + 40)) "$PYTHON" "$HERE/ble_central.py" \
 		--addr "$BT_ADDR" --duration "$MAX_CONN_S" --scan-timeout 20 2>&1)"
 	echo "$creport" >>"$LOG"
 	kill "$hp" 2>/dev/null; wait "$hp" 2>/dev/null
