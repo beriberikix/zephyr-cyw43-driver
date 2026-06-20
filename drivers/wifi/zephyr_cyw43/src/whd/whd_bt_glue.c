@@ -48,6 +48,8 @@
 #include "whd_bus_common.h"
 #include "airoc_wifi.h"
 
+#include "whd_bus_lock.h"
+
 LOG_MODULE_REGISTER(whd_bt_glue, CONFIG_LOG_DEFAULT_LEVEL);
 
 /* The BT HCI driver and the cybt up-edge reference this global (.mac for the
@@ -65,18 +67,19 @@ static inline whd_driver_t bt_whd_driver(void)
 }
 
 /* --------------------------------------------------------------- bus lock */
-/* Zephyr k_mutex is recursive (per-owner lock_count), matching the
- * georgerobotics recursive bus lock the cybt code assumes. */
-static K_MUTEX_DEFINE(bt_bus_mutex);
-
+/* The cybt up-edge (CYW43_THREAD_ENTER/EXIT -> cyw43_thread_enter/exit) maps to
+ * the SHARED gSPI bus lock (whd_bus_lock.h), which WHD's WLAN path also takes
+ * (durable airoc_whd_hal_spi patch). Held across each whole cybt
+ * read-modify-write sequence, it serializes BT bus access against WHD's
+ * whd_thread — the W6 fix for the §2.7 concurrent-bus corruption. */
 void cyw43_thread_enter(void)
 {
-	k_mutex_lock(&bt_bus_mutex, K_FOREVER);
+	whd_bus_lock();
 }
 
 void cyw43_thread_exit(void)
 {
-	k_mutex_unlock(&bt_bus_mutex);
+	whd_bus_unlock();
 }
 
 /* --------------------------------------------------------------- host delay */

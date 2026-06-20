@@ -1,0 +1,14 @@
+=== characterization soak 20260620_002936  cycles=4 max_conn=90s load: pico_ping=1000ms host_ping=2s ===
+----- cycle 1/4 2026-06-20T00:29:36Z -----
+>> cycle 1: notif=0 conn=0s end=ALIVE disc=0
+----- cycle 2/4 2026-06-20T00:30:13Z -----
+>> cycle 2: notif=0 conn=0s end=ALIVE disc=0
+----- cycle 3/4 2026-06-20T00:30:40Z -----
+>> cycle 3: notif=0 conn=0s end=ALIVE disc=0
+----- cycle 4/4 2026-06-20T00:31:17Z -----
+>> cycle 4: notif=0 conn=0s end=ALIVE disc=0
+=== SUMMARY ===
+cycles: 4   faults: 0   clean-disconnects: 0
+total connected time: 0s   total notifications: 0
+MTBF: no faults in 0s connected (>= 0s)
+artifact: /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/test/coex/results/soak_20260620_002936.log

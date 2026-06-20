@@ -70,9 +70,9 @@ choice keeps the proven stack as default/fallback; the whole matrix stays green 
 | W1 | WHD WiFi-only scan (whd_init/attach/wifi_on/scan over PIO-SPI Zephyr device; resolves R1) | VERIFIED | docs/artifacts/w1_whd_scan_20260619.log — upstream AIROC driver scanned real APs (jberi_hil, funrun, 819 Paramount…) over the RP2350 PIO-SPI, "Scan request done". R1 RESOLVED: WHD's whd_bus_spi_transfer works via spi_transceive_dt (SPI_HALF_DUPLEX, spi-data-irq-shared GP24). Matrix green: WHD 13.72% / geo wifi+bt 14.16% / geo wifi-only 12.14%. |
 | W2 | WHD associate + DHCP via Zephyr net L2 (mirror airoc_wifi.c) | VERIFIED | docs/artifacts/w2_whd_assoc_dhcp_20260619.log — WHD 3.3.3.26653, STA assoc to funrun (State COMPLETED, WPA2-PSK, RSSI -48), DHCP 192.168.4.28, ping 8.8.8.8 3/3 0% loss. (W1's early-boot join failure was transient; clean reset associates.) |
 | W3 | BT-only bring-up over WHD-arbitrated bus; SEAM-1 primitives; BD_ADDR=MAC+1 | VERIFIED | docs/artifacts/w3_whd_bt_bringup_20260619.log + test/coex/results/w3_whd_bdaddr_10boots_20260619.log — whd_bt_glue.c runs cybt over WHD backplane; bt init OK (BD_ADDR 88:A2:9E:D1:6D:A0 = MAC+1, HCI 5.2 Infineon), advertising started, BD_ADDR STABLE across 10 cold boots. Matrix green WHD+BT 15.57%. DEFERRED to W4/W6: BT bus lock is BT-local (not yet shared with WHD WLAN thread) — a concurrent whd_wifi_join failed once during bt init (contention signal); BT RX is a 4ms poll (no host-wake IRQ hook). |
-| W4 | Coexistence parity — unchanged soak.sh/rx_stress.sh/ble_central.py; BT survives wifi disconnect | TODO | (pending) w4_whd_coex_soak |
+| W4 | Coexistence parity — unchanged soak.sh/rx_stress.sh/ble_central.py; BT survives wifi disconnect | IN-PROGRESS | docs/artifacts/w4_whd_coex_characterization_20260619.log — characterized: BT-local lock broke WLAN join under BT poll (the §2.7 contention, manifests as failed join not panic since cybt reads route through WHD's F1-overflow-aware path → 0 faults). The W6 shared bus lock FIXES device-side coex (WiFi associates with BT active, BLE advertising, 0 faults / 4 cyc). BLOCKED on: BLE not discoverable over-air (host scan can't find test-picow-bluetooth → bleak central 0 conn/0 notif) — an HCI-level issue (BT RX poll latency for adv-setup events?), must fix before the notification baseline. |
 | W5 | Init/power-order matrix (BT-only / WiFi→BT / BT→WiFi) + WiFi-only WHD build | TODO | (pending) w5_whd_initorder |
-| W6 | §2.7 fix: BT ring-index read via WHD F1-overflow-aware path (durable hal_rpi_pico patch); full 2 h soak zero faults | TODO | (pending) w6_soak_2h_clean |
+| W6 | §2.7 fix: BT ring-index read via WHD F1-overflow-aware path (durable hal_rpi_pico patch); full 2 h soak zero faults | IN-PROGRESS | docs/artifacts/w4_whd_coex_characterization_20260619.log — shared gSPI bus lock LANDED (patches/airoc_whd_hal_spi_shared_bus_lock.patch wraps whd_bus_spi_transfer; whd_transport.c defines whd_bus_lock; whd_bt_glue.c BT path takes it). Two §2.7 mitigations now in place: (1) cybt reads route through WHD's F1-overflow-aware backplane path → no more assert/panic (0 faults observed); (2) shared lock serializes WLAN vs BT → WiFi associates with BT active. The 2 h zero-fault gate is NOT yet runnable because the coex soak can't establish BLE connections (BLE over-air discoverability blocker, see W4). |
 | W7 | (optional) flip default to CYW43_TRANSPORT_WHD; matrix green | TODO | (pending) w7_default_flip |
 
 Architecture decision (W1): the WHD WiFi path REUSES the upstream Zephyr AIROC
@@ -114,12 +114,21 @@ seam + a bus lock + cyw43_state, all provided by src/whd/whd_bt_glue.c:
   + a 4 ms BT RX poll thread (no cyw43 poll thread in WHD mode)
 WHD handle via airoc_wifi_get_whd_interface()->whd_driver (whd_int.h).
 
-W6 CRUX (carried from W3): the BT bus lock is BT-LOCAL — it serializes cybt's
-own read-modify-write sequences but NOT against WHD's WLAN bus thread
-(airoc_whd_hal_spi.c has no mutex; WHD serializes via its single whd_thread).
-Under concurrent WiFi+BT bus traffic this is the §2.7 corruption path. W4
-characterizes it; W6 fixes it (a lock BOTH the WLAN path and BT take, and/or the
-F1-overflow-aware backplane read — which WHD's whd_bus path already has).
+W6 CRUX — RESOLVED (shared bus lock, see W6 row + patches/): both §2.7
+mitigations are in place — cybt reads go through WHD's F1-overflow-aware
+backplane path (no assert/panic), and a shared recursive gSPI lock serializes
+WHD's WLAN path against BT. Result: WiFi associates with BT active, 0 faults.
+
+NEXT (resume here): BLE OVER-AIR DISCOVERABILITY. With coexistence up (WiFi+BT,
+0 faults), the BLE peripheral logs "starting advertising" but the host cannot
+discover test-picow-bluetooth (BleakScanner finds other devices, not the Pico;
+ble_central.py -> "peripheral not found in scan"), so the coex soak gets 0
+connections / 0 notifications. Likely HCI-level: BT RX is a 4 ms timer poll
+(whd_bt_glue.c, no host-wake IRQ hook) — adv-setup command-complete/events may
+be delayed/dropped, or advertising params/data not taking effect. Investigate
+with BT HCI logging (CONFIG_BT_HCI_DRIVER_LOG_LEVEL_DBG / a non-soak build with
+BT_SHELL to `bt advertise on` + host scan). This blocks W4's notification
+baseline and W6's 2 h gate. Build: build_whd_soak (whd.conf;soak.conf + whd.overlay).
 
 ## BLE-connection command-timeout — ROOT CAUSE FOUND + fix (4f72d1f)
 ROOT CAUSE: I_HMB_FC_CHANGE (the BT "data ready" interrupt flag in
