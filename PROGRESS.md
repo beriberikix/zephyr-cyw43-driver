@@ -135,7 +135,25 @@ link-management drop remains before the full 2 h clean-hold gate.
   device end-state ALIVE = 0 §2.7 faults (georgerobotics faulted at 1162s WITH a
   device fault; WHD = 0 faults). BUT the link ended at ~102s (clean-teardown
   classification, not early-disconnect), short of the 1800s window.
-  ~101s DROP — characterized (2026-06-20), root cause still open:
+  ~101s DROP — ROOT CAUSE FOUND (2026-06-20): WHD packet-buffer POOL EXHAUSTION.
+    UART through the drop (diag101) shows repeating "Packet buffer allocation failed
+    in whd_bus_transfer_backplane_bytes". The airoc_pool (airoc_wifi.c:
+    NET_BUF_POOL_FIXED_DEFINE(airoc_pool, 20, 1600)) is shared by WiFi RX/TX AND
+    every BT backplane transfer; under moderate WiFi load it DRAINS, then the BT
+    backplane alloc fails -> BT dies -> BLE drops. It is a drain (pool 20: ~101s;
+    pool 48: ~185s), not transient contention. The BT path is the VICTIM.
+    Leak SITE not yet pinned (artifact w6_pool_exhaustion_rootcause_20260620.log):
+    ruled out the airoc_mgmt_send TX-error path (release fix did NOT help, dropped
+    76.9s, reverted), whd_bus_transfer_backplane_bytes (releases via 'done:'), and
+    RX process_ethernet_data (releases line 433). Likely a WHD-internal RX/IOCTL/
+    event-path leak or a subtler accounting issue.
+    NEXT: instrument airoc_wifi_host_buffer_get / airoc_wifi_buffer_release with
+    per-direction alloc/release counters + log net_buf pool availability under load
+    to localize the leak; then fix it, OR adopt a larger airoc_pool as a documented
+    bounded-load mitigation (it scales the time-to-drop). A real fix or a big-enough
+    pool -> the moderate-load + 2 h gate -> W6 VERIFIED.
+
+  (historical) ~101s DROP — characterized (2026-06-20), root cause still open:
     - It is NOT host-side: no WiFi load held 300s clean (2963 notif, 0 faults);
       HALF load (dev ping 2s + host ping 4s) also held 300s clean. Only MODERATE
       load (dev ping 1s + host ping 2s) drops, at a strikingly DETERMINISTIC
