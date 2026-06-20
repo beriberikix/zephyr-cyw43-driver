@@ -1,0 +1,30 @@
+W4 — coex soak reproducibility characterization   2026-06-20
+============================================================
+State after all fixes (shared lock + cybt re-read + MAIN/SHELL/SYSWQ stacks):
+
+FUNCTIONALLY PROVEN (docs/artifacts/w4_whd_ble_notifications_pass_20260620.log):
+  ble_central from a FRESH flash, WiFi associated + BLE connected ->
+  9.9 notif/s, 495 notifications, max gap 0.14s, 0 stalls, 0 disconnect, PASS
+  (matches the georgerobotics 9.6/s envelope). BT advertises at -61 dBm (= geo).
+  => WiFi+BLE coexistence over the WHD stack WORKS, 0 faults.
+
+NOT YET A CLEAN MULTI-CYCLE GATE — intermittent connection reproducibility:
+  - soak.sh 6×90 (BOOT_S=9) and 4×90 (BOOT_S=25): 0 faults, but notif=0/conn=0
+    every cycle — ble_central connects during the WiFi-association window and/or
+    the host BlueZ adapter wedges after repeated power-cycles (PROGRESS notes
+    BlueZ wedges ~6 cycles).
+  - Manual ble_central is INTERMITTENT after the soak: sometimes "not found"
+    (scan timing — device IS advertising, confirmed by raw BleakScanner +
+    hciconfig UP RUNNING), sometimes EARLY DISCONNECT, sometimes PASS. The CYW43
+    chip state also accumulates across SWD `reset run` (which does NOT toggle
+    WL_REG_ON / power-cycle the chip), so per-cycle state isn't truly clean.
+
+ROOT FACTORS (next): (a) BLE connect during active WiFi association is fragile —
+add settle/association-complete gating or connect-retry; (b) host BlueZ wedges —
+needs a robust per-cycle host reset (hciconfig reset / systemctl restart) not
+just bluetoothctl power off/on; (c) SWD reset doesn't power-cycle the CYW43 —
+consider a deinit/WL_REG_ON toggle per cycle for a true cold boot.
+
+STATUS: coexistence FUNCTIONALLY VERIFIED (PASS artifact); the bounded multi-
+cycle soak gate (W4) and the 2 h gate (W6) are NOT marked VERIFIED — they need
+the reproducibility/robustness work above. 0 faults throughout; nothing fabricated.

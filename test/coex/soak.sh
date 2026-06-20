@@ -19,7 +19,11 @@ CYCLES="${1:-8}"
 MAX_CONN_S="${2:-90}"
 PICO_IP="${3:-192.168.4.28}"
 BT_ADDR="${4:-88:A2:9E:D1:6D:A0}"
-BOOT_S=9
+# Settle time after reset before driving load + connecting the BLE central.
+# Env-overridable: the WHD/AIROC backend associates WiFi slower (~14-21 s) and
+# the BLE peripheral should be in steady state before the central connects, so
+# the WHD soak uses BOOT_S=25 (georgerobotics default 9 is too early for it).
+BOOT_S="${BOOT_S:-9}"
 # WiFi load knobs (env-overridable). Pico->internet ping interval (ms) and
 # host->Pico ping interval (s). Defaults = moderate. For the BOUNDED-load
 # certification (see PROGRESS "SOAK ROOT CAUSE") use a lighter load, e.g.

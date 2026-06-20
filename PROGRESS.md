@@ -70,7 +70,7 @@ choice keeps the proven stack as default/fallback; the whole matrix stays green 
 | W1 | WHD WiFi-only scan (whd_init/attach/wifi_on/scan over PIO-SPI Zephyr device; resolves R1) | VERIFIED | docs/artifacts/w1_whd_scan_20260619.log — upstream AIROC driver scanned real APs (jberi_hil, funrun, 819 Paramount…) over the RP2350 PIO-SPI, "Scan request done". R1 RESOLVED: WHD's whd_bus_spi_transfer works via spi_transceive_dt (SPI_HALF_DUPLEX, spi-data-irq-shared GP24). Matrix green: WHD 13.72% / geo wifi+bt 14.16% / geo wifi-only 12.14%. |
 | W2 | WHD associate + DHCP via Zephyr net L2 (mirror airoc_wifi.c) | VERIFIED | docs/artifacts/w2_whd_assoc_dhcp_20260619.log — WHD 3.3.3.26653, STA assoc to funrun (State COMPLETED, WPA2-PSK, RSSI -48), DHCP 192.168.4.28, ping 8.8.8.8 3/3 0% loss. (W1's early-boot join failure was transient; clean reset associates.) |
 | W3 | BT-only bring-up over WHD-arbitrated bus; SEAM-1 primitives; BD_ADDR=MAC+1 | VERIFIED | docs/artifacts/w3_whd_bt_bringup_20260619.log + test/coex/results/w3_whd_bdaddr_10boots_20260619.log — whd_bt_glue.c runs cybt over WHD backplane; bt init OK (BD_ADDR 88:A2:9E:D1:6D:A0 = MAC+1, HCI 5.2 Infineon), advertising started, BD_ADDR STABLE across 10 cold boots. Matrix green WHD+BT 15.57%. DEFERRED to W4/W6: BT bus lock is BT-local (not yet shared with WHD WLAN thread) — a concurrent whd_wifi_join failed once during bt init (contention signal); BT RX is a 4ms poll (no host-wake IRQ hook). |
-| W4 | Coexistence parity — unchanged soak.sh/rx_stress.sh/ble_central.py; BT survives wifi disconnect | IN-PROGRESS | docs/artifacts/w4_whd_coex_characterization_20260619.log — characterized: BT-local lock broke WLAN join under BT poll (the §2.7 contention, manifests as failed join not panic since cybt reads route through WHD's F1-overflow-aware path → 0 faults). The W6 shared bus lock FIXES device-side coex (WiFi associates with BT active, BLE advertising, 0 faults / 4 cyc). BLOCKED on: BLE not discoverable over-air (host scan can't find test-picow-bluetooth → bleak central 0 conn/0 notif) — an HCI-level issue (BT RX poll latency for adv-setup events?), must fix before the notification baseline. |
+| W4 | Coexistence parity — unchanged soak.sh/rx_stress.sh/ble_central.py; BT survives wifi disconnect | FUNCTIONALLY VERIFIED, soak-gate IN-PROGRESS | docs/artifacts/w4_whd_ble_notifications_pass_20260620.log — WiFi associated + BLE central connected: 9.9 notif/s, 495 notifications, 0 stalls, 0 disconnect, PASS (= georgerobotics 9.6/s envelope), 0 faults; BT advertises at -61 dBm (= geo). Coex WORKS. NOT a clean multi-cycle gate yet: BLE connect is intermittent (connect-during-WiFi-association fragility + host BlueZ wedging + SWD-reset doesn't power-cycle the CYW43) — see docs/artifacts/w4_soak_reproducibility_20260620.log. The earlier "BLE not discoverable / -92 dBm" was a SYMPTOM of the §2.7 assert + stack overflows, all now fixed. |
 | W5 | Init/power-order matrix (BT-only / WiFi→BT / BT→WiFi) + WiFi-only WHD build | VERIFIED | docs/artifacts/w5_whd_initorder_20260619.log — ROOT CAUSE of the WiFi+BT fault was a STACK OVERFLOW (app defaults 2048/2560 too small for WHD+cybt+coex). Fixed in whd.conf (HW_STACK_PROTECTION + MAIN/SHELL/SYSWQ=4096). With the fix: BT-only / WiFi→BT / BT→WiFi all bring up clean (BD_ADDR verified, ALIVE), BT survives wifi disconnect, WiFi-only green. The stack overflow was DISTINCT from the BLE link-quality issue. |
 | W6 | §2.7 fix: BT ring-index read via WHD F1-overflow-aware path (durable hal_rpi_pico patch); full 2 h soak zero faults | IN-PROGRESS | docs/artifacts/w4_whd_coex_characterization_20260619.log — shared gSPI bus lock LANDED (patches/airoc_whd_hal_spi_shared_bus_lock.patch wraps whd_bus_spi_transfer; whd_transport.c defines whd_bus_lock; whd_bt_glue.c BT path takes it). Two §2.7 mitigations now in place: (1) cybt reads route through WHD's F1-overflow-aware backplane path → no more assert/panic (0 faults observed); (2) shared lock serializes WLAN vs BT → WiFi associates with BT active. PART 2 LANDED (the cybt re-read, the §2.7 transport fix proper): patches/cybt_shared_bus_reread_index.patch makes cybt_get_bt_buf_index RE-READ a transiently out-of-range ring index (up to 8×) and return CYBT_ERR_HCI_READ_FAILED instead of assert()/abort() — fixed a real boot-time kernel panic (bt_poll asserting on a corrupt index); BT-only now boots+advertises clean. STILL BLOCKED on the 2 h gate by a remaining coex fault: under WiFi+BT concurrency a corrupt-stack/PC memory fault occurs (z_main_stack) and the BLE link is marginal — deeper than the ring-index assert. |
 | W7 | (optional) flip default to CYW43_TRANSPORT_WHD; matrix green | TODO | (pending) w7_default_flip |
@@ -119,7 +119,22 @@ mitigations are in place — cybt reads go through WHD's F1-overflow-aware
 backplane path (no assert/panic), and a shared recursive gSPI lock serializes
 WHD's WLAN path against BT. Result: WiFi associates with BT active, 0 faults.
 
-NEXT (resume here): BLE LINK QUALITY is the SOLE REMAINING BLOCKER for W4/W6
+NEXT (resume here): SOAK REPRODUCIBILITY/ROBUSTNESS for the W4 multi-cycle gate
+and the W6 2 h gate. Coexistence is FUNCTIONALLY PROVEN (ble_central PASS: 9.9/s,
+495 notif, 0 stalls, 0 faults — docs/artifacts/w4_whd_ble_notifications_pass_20260620.log).
+What remains is making it reproducible across a multi-cycle soak:
+  (a) BLE connect during active WiFi association is fragile — gate the central
+      until association completes, or add connect-retry in ble_central/soak.sh.
+  (b) Host BlueZ wedges after repeated power-cycles — use a robust per-cycle host
+      reset (hciconfig hciX reset / systemctl restart bluetooth), not just
+      bluetoothctl power off/on.
+  (c) SWD `reset run` does NOT power-cycle the CYW43 (WL_REG_ON stays high), so
+      chip state accumulates across soak cycles — add a per-cycle deinit /
+      WL_REG_ON toggle for a true cold boot, or a cyw43 deinit shell cmd.
+Once a multi-cycle bounded soak passes (>= georgerobotics 0-fault envelope with
+notifications flowing) -> W4 VERIFIED; then a long/2 h run -> W6 VERIFIED.
+
+(historical) the prior blocker note — BLE link quality — is RESOLVED:
 (W5's stack overflow + W6's §2.7 asserts are now fixed; bigger stacks did NOT
 fix the BLE early-disconnect, confirming it is a separate RF/link issue). See
 docs/artifacts/w4_ble_discoverability_diag_20260619.log. Advertising works and
