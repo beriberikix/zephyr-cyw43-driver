@@ -135,7 +135,30 @@ link-management drop remains before the full 2 h clean-hold gate.
   device end-state ALIVE = 0 §2.7 faults (georgerobotics faulted at 1162s WITH a
   device fault; WHD = 0 faults). BUT the link ended at ~102s (clean-teardown
   classification, not early-disconnect), short of the 1800s window.
-  ~101s DROP — ROOT CAUSE FOUND (2026-06-20): WHD packet-buffer POOL EXHAUSTION.
+  ~101s DROP — LOCALIZED to a WiFi-TX-queue STALL (2026-06-20, instrumented):
+    Added per-direction alloc/release counters to airoc_wifi_host_buffer_get/release
+    and gdb-read them at exhaustion: pdbg_alloc={TX 1217, RX 27471}, pdbg_rel={TX
+    1197, RX 27471}. RX is perfectly balanced (no leak); TX has exactly 20 buffers
+    allocated-but-not-released = the whole 20-buffer airoc_pool, all in WiFi TX.
+    But the SPI send path FREES the buffer even on failure (whd_bus_spi_send_buffer,
+    whd_bus_spi_protocol.c:292 releases unconditionally), so the TX failure path is
+    NOT a leak. => the 20 TX buffers are STUCK in the WHD SDPCM TX queue: under
+    WiFi+BT bus contention the WHD thread can't drain queued TX (chip TX
+    flow-control / credit starvation on the shared gSPI bus), so they pile up until
+    the pool is empty -> BT backplane allocs fail -> BLE drops. A TX-queue STALL
+    under sustained coex contention, NOT a missing free.
+    (artifact docs/artifacts/w6_txqueue_stall_localized_20260620.log)
+    IMPLICATIONS: LIGHT/HALF load never stalls (held 300s, 0 faults) so the
+    BOUNDED-load W6 gate is achievable as-is; MODERATE load exceeds the shared-3-pin
+    gSPI coex bandwidth (analogous to the georgerobotics bounded-load certification).
+    NEXT (pick): (a) certify the bounded-load 2h gate (light/half load) + document
+    the moderate-load shared-bus limit -> W6 ACCEPTED-with-residual (matches the
+    original georgerobotics disposition); or (b) deeper WHD TX flow-control fix:
+    bound/drain the SDPCM TX queue under contention, or reserve airoc_pool headroom
+    for the BT backplane (a separate small pool for backplane transfers so WiFi TX
+    backpressure can't starve BT) -- the cleanest real fix.
+
+  (historical) ~101s DROP — ROOT CAUSE FOUND (2026-06-20): WHD packet-buffer POOL EXHAUSTION.
     UART through the drop (diag101) shows repeating "Packet buffer allocation failed
     in whd_bus_transfer_backplane_bytes". The airoc_pool (airoc_wifi.c:
     NET_BUF_POOL_FIXED_DEFINE(airoc_pool, 20, 1600)) is shared by WiFi RX/TX AND

@@ -1,0 +1,30 @@
+=== W6 ~101s drop — leak LOCALIZED to the WiFi TX path (2026-06-20) ===
+Instrumented airoc_wifi_host_buffer_get/release with per-direction counters;
+gdb-read at pool exhaustion (moderate load):
+  pdbg_alloc = {TX 1217, RX 27471}
+  pdbg_rel   = {TX 1197, RX 27471}
+  => RX perfectly balanced (no leak); TX has 20 buffers allocated-but-not-
+     released = the ENTIRE 20-buffer airoc_pool, held in WiFi TX.
+
+But the SPI send path FREES the buffer even on failure:
+  whd_bus_spi_send_buffer (whd_bus_spi_protocol.c:289) calls whd_buffer_release
+  at line 292 UNCONDITIONALLY (before checking result). So the TX failure path
+  in whd_thread.c (whd_send_one_packet line 151-154, no explicit release) does
+  NOT leak -- the buffer is freed inside send_buffer.
+
+CONCLUSION: the 20 TX buffers are STUCK in the WHD SDPCM TX queue, not lost.
+Under WiFi+BT bus contention the WHD thread cannot drain queued TX (chip TX
+flow-control / credit starvation on the shared gSPI bus), so TX buffers pile up
+until the pool is empty -> BT backplane allocs fail -> BLE drops. A TX-queue
+STALL under sustained coex contention, not a missing free.
+
+Earlier ruled out: airoc_mgmt_send TX-error release (no help), backplane path
+(releases via done:), RX path (balanced, per counters).
+
+IMPLICATIONS / NEXT:
+  - LIGHT/HALF WiFi load never stalls (held 300s, 0 faults) -> the bounded-load
+    W6 gate is achievable as-is; MODERATE load exceeds the shared-3-pin-bus coex
+    bandwidth (analogous to the georgerobotics bounded-load certification).
+  - A real fix needs WHD TX flow-control work under contention (drain/bound the
+    SDPCM TX queue, or reserve pool headroom for the BT backplane), or a larger
+    airoc_pool (delays but does not eliminate: 20->48 moved 101s->185s).
