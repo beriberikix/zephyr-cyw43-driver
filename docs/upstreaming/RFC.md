@@ -57,7 +57,15 @@ The four supporting fixes:
 
 **Validation (hardware, `rpi_pico2/rp2350a/m33/w`).** BT bring-up: advertise + connect, BD_ADDR stable 10/10 cold boots. Coexistence: a **2 h continuous WiFi+BLE soak — 71,021 notifications / 7200.1 s @ 9.9/s, 0 stalls, 0 unexpected disconnects, 0 faults.** Each fix was root-caused with hardware evidence — e.g. a same-bench TX-power A/B traced weak BLE to `btc_mode=0` (−92 dBm → −67 dBm enabled); the sustained-load BLE drop was pinned by gdb in-flight buffer counters at pool exhaustion (`alloc{TX 1217, RX 27471}` vs `release{TX 1197, RX 27471}` → RX balanced, 20 TX buffers stuck in the WHD TX queue draining the shared pool), and load-scaling confirmed it (no/half WiFi load held 300 s clean, moderate load dropped ~101 s) — closed by the buffer reserve.
 
-**Reproduction.** A self-contained coexistence harness (`test/coex/`: `soak.sh`, `ble_central.py`, reset-until-discoverable) plus archived raw logs for both transports.
+**Reference implementation & evidence (working code on a public fork).** Everything above is committed and browsable — please dig in rather than take my word for it:
+
+- Branch (implementation + test harness + raw logs): https://github.com/beriberikix/zephyr-cyw43-driver/tree/whd-port — full commit-by-commit history (the W0–W6 progression) in the tracking PR: https://github.com/beriberikix/zephyr-cyw43-driver/pull/1 (the branch may advance; the PR shows the development).
+- The four fixes as patches, each documented in `patches/README.md`: https://github.com/beriberikix/zephyr-cyw43-driver/tree/whd-port/patches
+- The BT-over-WHD glue: https://github.com/beriberikix/zephyr-cyw43-driver/blob/whd-port/drivers/wifi/zephyr_cyw43/src/whd/whd_bt_glue.c
+- The coexistence test harness (`soak.sh`, `ble_central.py`, reset-until-discoverable): https://github.com/beriberikix/zephyr-cyw43-driver/tree/whd-port/test/coex
+- Headline hardware logs (all under `docs/artifacts/` and `test/coex/results/` on the branch): the 2 h soak — https://github.com/beriberikix/zephyr-cyw43-driver/blob/whd-port/docs/artifacts/w6_soak_2h_clean_20260620.log ; the gdb buffer counters proving the TX-queue stall — https://github.com/beriberikix/zephyr-cyw43-driver/blob/whd-port/docs/artifacts/w6_txqueue_stall_localized_20260620.log ; the BT TX-power A/B — https://github.com/beriberikix/zephyr-cyw43-driver/blob/whd-port/docs/artifacts/w4_btx_geo_vs_whd_discriminator_20260620.log ; and the §2.7 gdb proof that the corruption is below the host lock — https://github.com/beriberikix/zephyr-cyw43-driver/blob/whd-port/test/coex/results/txlock_mutex_held_at_fault_20260619.txt
+
+NB the reference fork is the out-of-tree Beechwoods `zephyr-cyw43-driver` module (where both transports live behind a build-time switch); the upstream-bound pieces are the four patches + the proposed shared-bus HCI transport, not the whole module.
 
 ## FIELD: Dependencies
 

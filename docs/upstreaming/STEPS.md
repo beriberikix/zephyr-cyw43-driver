@@ -29,6 +29,11 @@ Cross-references: `RFC.md`, `track-A-zephyr-airoc-leakfix.md`,
       Proposed Change (Detailed), Dependencies, Concerns and Unresolved Questions,
       Alternatives Considered. (Skip the leading HTML comment.) Set sidebar
       **Priority** to your judgement (Low/Medium is fine).
+- [ ] The RFC's "Reference implementation & evidence" links the public fork
+      `beriberikix/zephyr-cyw43-driver` @ `whd-port` + PR #1 (confirmed public, so
+      the links resolve). (Optional, for durable URLs as the branch advances: tag
+      the state — `git tag rfc-snapshot && git push origin rfc-snapshot` — and
+      swap `whd-port` → `rfc-snapshot` in the RFC links before pasting.)
 - [ ] Note the issue number as `<RFC#>` and use it in later PRs.
 - [ ] Announce it on Discord — **`#raspberrypi`** and **`#infineon`** only (the
       vendor channels) — using the two hooks in
