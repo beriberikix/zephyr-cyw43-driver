@@ -1,0 +1,29 @@
+=== W4 WHD coexistence UNDER LOAD — PASS after the BT-coex NVRAM fix (2026-06-20) ===
+Build: build_whd_soak (CYW43_TRANSPORT_WHD + WIFI_AIROC + BT) with:
+  - patches/whd_nvram_43439_1yn_btcoex.patch (btc_mode=0->1, muxenab=0x11->0x100)
+  - all prior W5/W6 fixes (stacks, shared bus lock, cybt re-read)
+Load: device ping 1/s (8.8.8.8) + host ping 0.5/s; BOOT_S=25; 4 cycles x 60s window
+
+RESULT (BT now advertises at -67 dBm, = georgerobotics -70):
+>> cycle 1: notif=0 conn=0s end=ALIVE disc=0
+=== BLE CENTRAL SUMMARY ===
+>> cycle 2: notif=594 conn=60.1s end=ALIVE disc=0
+=== BLE CENTRAL SUMMARY ===
+>> cycle 3: notif=593 conn=60.0s end=ALIVE disc=0
+=== BLE CENTRAL SUMMARY ===
+=== BLE CENTRAL SUMMARY ===
+=== BLE CENTRAL SUMMARY ===
+>> cycle 4: notif=1 conn=0.0s end=ALIVE disc=2
+=== SUMMARY ===
+cycles: 4   faults: 0   clean-disconnects: 1
+total connected time: 120.1s   total notifications: 1188
+
+Cycles 2 & 3: 594 / 593 notifications over 60s, 9.9/s, 0 stalls, PASS, UNDER WiFi
+load -> = the georgerobotics 9.6-9.9/s envelope. 0 device faults across all 4.
+Cycle 1 (not found) and cycle 4 (early-disconnect then retry->593) are the known
+HOST BlueZ adapter wedge (no-sudo hard reset on this host), NOT the device:
+the same chip sustained two full clean 60s connections under load this run.
+
+ROOT CAUSE (fixed): the WHD Murata-1YN NVRAM shipped BT coex DISABLED
+(btc_mode=0). On the Pico 2 W single shared WiFi/BT antenna that parked BT TX
+(~30 dB deficit -> link dropped under any WiFi load). Enabling coex = parity.

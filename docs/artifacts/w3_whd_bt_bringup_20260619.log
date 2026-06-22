@@ -1,0 +1,39 @@
+W3 — BT bring-up over the WHD-arbitrated bus (cybt retained, driven via WHD)  2026-06-19
+=======================================================================================
+Board: rpi_pico2/rp2350a/m33/w   Debug Probe CMSIS-DAP if01
+Build: build_whd  CONFIG_CYW43_TRANSPORT_WHD=y CONFIG_WIFI_AIROC=y CONFIG_BT=y
+       FLASH 653176 B 15.57%  RAM 159792 B 30.01%
+Glue:  drivers/wifi/zephyr_cyw43/src/whd/whd_bt_glue.c — provides the 4 cyw43_ll
+       backplane primitives via WHD (whd_bus_{read,write}_backplane_value,
+       whd_bus_transfer_backplane_bytes), a recursive BT bus lock, cyw43_state
+       (.mac from whd_wifi_get_mac_address), the SEAM-1 cyw43_bluetooth_hci_*
+       wrappers (lazy patchram download), and a BT RX poll thread (4 ms) since
+       WHD mode has no georgerobotics poll thread.
+Build matrix green: WHD+BT 15.57% / geo wifi+bt 14.16% / geo wifi-only 12.14%.
+
+--- bt init (cybt patchram downloaded over WHD backplane; HCI round-trips work) ---
+<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)
+<inf> bt_hci_core: HCI transport: HCI
+<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)
+<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131
+<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310
+
+--- bt advertise on ---
+Advertising started
+
+--- BD_ADDR stability across 10 SWD cold boots (test/coex/results/w3_whd_bdaddr_10boots_20260619.log) ---
+distinct addresses: 1
+RESULT: STABLE across 10 cold boots   (all 88:A2:9E:D1:6D:A0 = WiFi MAC + 1)
+
+RESULT: W3 PASS — the BT HCI path runs over the WHD bus: chip up (WHD), BT
+patchram (cybt over WHD backplane), HCI command/event round-trips (TX + BT poll
+thread RX), public BD_ADDR = WiFi MAC + 1 stable across 10 cold boots, advertising.
+
+KNOWN / DEFERRED to W4-W6:
+- During `bt init`, the app's concurrent WiFi auto-connect (whd_wifi_join) failed
+  once — a coexistence/bus-contention signal under simultaneous WiFi+BT bus use.
+  The W3 BT bus lock is BT-LOCAL (serializes cybt's own RMW sequences) and does
+  NOT yet serialize against WHD's WLAN thread. Cross-WHD bus arbitration + the
+  §2.7 corruption envelope are W4/W6.
+- BT RX is a 4 ms poll (no host-wake IRQ hook in WHD mode yet); revisit latency
+  vs bus-contention in W4.

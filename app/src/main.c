@@ -6,9 +6,14 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <zephyr/kernel.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_config.h>
+
+#if defined(CONFIG_APP_BLE_PERIPHERAL)
+void app_ble_peripheral_start(void);
+#endif
 
 void wifi_connect(char *ssid, char * passwd) {
     int ret;
@@ -34,7 +39,11 @@ int main(void)
 	 * NET_SHELL is enabled to test driver and network stack
 	 */
 
-  if (strcmp(CONFIG_WIFI_SSID, "") && strcmp(CONFIG_WIFI_PSK, "")) {
+  if (!IS_ENABLED(CONFIG_APP_WIFI_AUTOCONNECT)) {
+    printf("WiFi auto-connect disabled (CONFIG_APP_WIFI_AUTOCONNECT=n);"
+           " radio is up, no association. Use 'wifi connect' to associate.\n");
+  }
+  else if (strcmp(CONFIG_WIFI_SSID, "") && strcmp(CONFIG_WIFI_PSK, "")) {
     sleep(1);
     printf("Connecting to network \"%s\"\n", CONFIG_WIFI_SSID);
     wifi_connect(CONFIG_WIFI_SSID, CONFIG_WIFI_PSK);
@@ -50,5 +59,9 @@ int main(void)
     printf("\n");
   }
   (void)net_config_init_app(NULL, "Initializing network");
+
+#if defined(CONFIG_APP_BLE_PERIPHERAL)
+  app_ble_peripheral_start();
+#endif
   return 0;
 }

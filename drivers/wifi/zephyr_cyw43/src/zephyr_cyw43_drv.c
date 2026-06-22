@@ -32,8 +32,44 @@ static zephyr_cyw43_dev_t zephyr_cyw43_0; /* static instance */
 zephyr_cyw43_dev_t *zephyr_cyw43_dev = &zephyr_cyw43_0;
 
 #define EVENT_POLL_THREAD_STACK_SIZE 1024
-#define EVENT_POLL_THREAD_PRIO 2
+/*
+ * Shared-bus poll thread priority.
+ *
+ * This thread is the sole reader of the gSPI bus; it reads HCI events and WiFi
+ * packets and hands them to the Bluetooth host RX workqueue (cooperative prio
+ * K_PRIO_COOP(CONFIG_BT_RX_PRIO) == coop -8) and the WiFi RX queue. It MUST
+ * stay cooperative: the georgerobotics cyw43_ll code relies on the poll thread
+ * not being preempted for its implicit mutual exclusion (making it preemptible
+ * corrupts cyw43_ll state -> assert/abort under concurrent WiFi+BT load).
+ *
+ * It runs at coop -2 (lowest cooperative band). Priority history (all
+ * cooperative, so none preempts another):
+ *  - K_PRIO_COOP(2) == coop -14 (original, HIGHEST): under a host-wake flood
+ *    the poll's only yield (CYW43_EVENT_POLL_HOOK k_yield()) could not hand off
+ *    to a LOWER coop thread, so events were read but never delivered ->
+ *    command timeout. Predates the per-wake drain (drain loop below).
+ *  - coop -10 (one band ABOVE both BT threads, tried for the soak bt2host-ring
+ *    overflow): did NOT remove the soak fault -- that residual is a gSPI
+ *    corruption BELOW this driver in the vendored cybt transport
+ *    (REFERENCE.md 2.7), which host-side priority cannot fix (it persists with
+ *    the bus lock held). With no benefit to justify moving off the
+ *    verified-good baseline, reverted to -2.
+ *  - coop -2 (current, LOWEST band): sits below the BT RX workqueue (-8). The
+ *    per-wake drain (CYW43_POLL_DRAIN_MAX) empties pending work and then the
+ *    poll BLOCKS on event_sem, releasing the CPU to the RX WQ / WiFi RX / bt_tx
+ *    so command-completes are delivered within HCI_CMD_TIMEOUT. This is the
+ *    value under which items 1-5 and the RX-flood stress (item 3) are verified
+ *    clean; it neither starves the RX consumers nor over-drives the bus.
+ *
+ * K_PRIO_COOP(x) == -(CONFIG_NUM_COOP_PRIORITIES - x); a SMALLER x is a higher
+ * (more negative) priority, so NUM_COOP_PRIORITIES-2 is the lowest coop band.
+ */
+#define EVENT_POLL_THREAD_PRIO (CONFIG_NUM_COOP_PRIORITIES - 2)
 K_KERNEL_STACK_MEMBER(zephyr_cyw43_event_poll_stack, EVENT_POLL_THREAD_STACK_SIZE);
+
+/* Max cyw43_poll() iterations to drain per poll-thread wake (bounds bus-lock
+ * hold time; the remainder is serviced on the next wake). */
+#define CYW43_POLL_DRAIN_MAX 32
 
 struct k_thread event_thread;
 static void zephyr_cyw43_event_poll_thread(void *p1)
@@ -56,6 +92,29 @@ static void zephyr_cyw43_event_poll_thread(void *p1)
                 if (cyw43_poll) {
                         zephyr_cyw43_lock(zephyr_cyw43_dev);
                         cyw43_poll();
+                        /*
+                         * A single cyw43_poll() (cyw43_poll_func) services at
+                         * most ONE BT packet and one WiFi pass. During an active
+                         * BLE connection the controller streams connection/ACL
+                         * events, and an HCI command-complete can sit behind that
+                         * backlog; draining one-per-wake misses HCI_CMD_TIMEOUT
+                         * ("Controller unresponsive"). Drain the rest of the
+                         * pending work this wake, bounded so a continuous stream
+                         * cannot hold the bus lock indefinitely (the remainder is
+                         * picked up on the next wake).
+                         */
+                        for (int i = 0; i < CYW43_POLL_DRAIN_MAX; i++) {
+                                bool more = cyw43_ll_has_work(&cyw43_state.cyw43_ll);
+#if defined(CONFIG_BT)
+                                /* cyw43_ll_bt_has_work is only built with BT. */
+                                more = more ||
+                                       cyw43_ll_bt_has_work(&cyw43_state.cyw43_ll);
+#endif
+                                if (!more) {
+                                        break;
+                                }
+                                cyw43_poll();
+                        }
                         zephyr_cyw43_unlock(zephyr_cyw43_dev);
                 }
                 else {
@@ -348,13 +407,13 @@ static int zephyr_cyw43_enable_ap(zephyr_cyw43_dev_t *zephyr_cyw43_device)
         static struct in_addr netmask;
         
         if (net_addr_pton(AF_INET, CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_ADDRESS, &addr)) {
-            NET_ERR("Invalid address: %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_ADDRESS);
+            LOG_ERR("Invalid address: %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_ADDRESS);
             return rv;
         }
         LOG_INF("Set IP addr to %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_ADDRESS);
         
         if (net_addr_pton(AF_INET, CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_NETMASK, &netmask)) {
-            NET_ERR("Invalid netmask: %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_NETMASK);
+            LOG_ERR("Invalid netmask: %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_NETMASK);
             return rv;
         }
         LOG_INF("Set IP netmask to %s", CONFIG_CYW43_WIFI_AP_AUTO_DHCPV4_NETMASK);
@@ -517,8 +576,10 @@ static void zephyr_cyw43_iface_init(struct net_if *iface)
 }
 
 int zephyr_cyw43_iface_status(const struct device *dev,
+                              struct net_if *iface,
                               struct wifi_iface_status *status)
 {
+        ARG_UNUSED(iface);
         LOG_DBG("Calling iface_status()\n");
 
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
@@ -589,9 +650,11 @@ int zephyr_cyw43_iface_status(const struct device *dev,
 }
 
 static int zephyr_cyw43_mgmt_scan(const struct device *dev,
+                                  struct net_if *iface,
                                   struct wifi_scan_params *params,
                                   scan_result_cb_t cb)
 {
+        ARG_UNUSED(iface);
 
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
 
@@ -613,10 +676,13 @@ static int zephyr_cyw43_mgmt_scan(const struct device *dev,
 }
 
 static int zephyr_cyw43_mgmt_connect(const struct device *dev,
+                                     struct net_if *iface,
                                      struct wifi_connect_req_params *params)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
         int rv=0;
+
+        ARG_UNUSED(iface);
 
         LOG_DBG("");
 
@@ -655,9 +721,12 @@ static int zephyr_cyw43_mgmt_connect(const struct device *dev,
         return rv;
 }
 
-static int zephyr_cyw43_mgmt_disconnect(const struct device *dev)
+static int zephyr_cyw43_mgmt_disconnect(const struct device *dev,
+                                        struct net_if *iface)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
+
+        ARG_UNUSED(iface);
         LOG_DBG("");
         zephyr_cyw43_lock(zephyr_cyw43_device);
         zephyr_cyw43_device->req = ZEPHYR_CYW43_REQ_DISCONNECT;
@@ -667,10 +736,13 @@ static int zephyr_cyw43_mgmt_disconnect(const struct device *dev)
 }
 
 static int zephyr_cyw43_mgmt_ap_enable(const struct device *dev,
+                                       struct net_if *iface,
                                        struct wifi_connect_req_params *params)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
         int rv = 0;
+
+        ARG_UNUSED(iface);
 
         LOG_DBG("Calling mgmt_ap_enable()\n");
 
@@ -707,10 +779,12 @@ static int zephyr_cyw43_mgmt_ap_enable(const struct device *dev,
         return rv;
 }
 
-static int zephyr_cyw43_mgmt_ap_disable(const struct device *dev)
+static int zephyr_cyw43_mgmt_ap_disable(const struct device *dev,
+                                        struct net_if *iface)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
 
+        ARG_UNUSED(iface);
         LOG_DBG("Calling mgmt_ap_disable()\n");
         zephyr_cyw43_lock(zephyr_cyw43_device);
         zephyr_cyw43_device->req = ZEPHYR_CYW43_REQ_DISABLE_AP;
@@ -719,11 +793,14 @@ static int zephyr_cyw43_mgmt_ap_disable(const struct device *dev)
         return 0;
 }
 
-static int zephyr_cyw43_mgmt_set_pm(const struct device *dev, struct wifi_ps_params *params)
+static int zephyr_cyw43_mgmt_set_pm(const struct device *dev, struct net_if *iface,
+                                    struct wifi_ps_params *params)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
 
         uint8_t pm_mode;
+
+        ARG_UNUSED(iface);
         uint16_t pm2_sleep_ret_ms = 0;
         uint8_t li_beacon_period = 0;
         uint8_t li_dtim_period = 0;
@@ -770,9 +847,12 @@ static int zephyr_cyw43_mgmt_set_pm(const struct device *dev, struct wifi_ps_par
         return 0;
 }
 
-static int zephyr_cyw43_pm_status(const struct device *dev, struct wifi_ps_config *config)
+static int zephyr_cyw43_pm_status(const struct device *dev, struct net_if *iface,
+                                  struct wifi_ps_config *config)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
+
+        ARG_UNUSED(iface);
         LOG_DBG("");
 
         uint8_t pm_mode;
@@ -967,10 +1047,12 @@ static void zephyr_cyw43_register_cb()
 }
 
 #if defined(CONFIG_NET_STATISTICS_WIFI)
-static int zephyr_cyw43_wifi_stats(const struct device *dev, struct net_stats_wifi *stats)
+static int zephyr_cyw43_wifi_stats(const struct device *dev, struct net_if *iface,
+                                   struct net_stats_wifi *stats)
 {
         zephyr_cyw43_dev_t *zephyr_cyw43_device = dev->data;
 
+        ARG_UNUSED(iface);
         stats->bytes.received = zephyr_cyw43_device->stats.bytes.received;
         stats->bytes.sent = zephyr_cyw43_device->stats.bytes.sent;
         stats->pkts.rx = zephyr_cyw43_device->stats.pkts.rx;

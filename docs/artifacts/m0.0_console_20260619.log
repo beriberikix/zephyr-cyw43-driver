@@ -1,0 +1,31 @@
+=== M0.0 boot capture (reset) 2026-06-19T13:38:19Z ===
+
+
+Running with the Zephyr PIO-SPI low level interface
+
+
+Version: 7.95.61 (abcd531 CY) CRC: 4528a809 Date: Wed 2023-01-11 10:29:38 PST Ucode Ver: 1043.2169 FWID 01-7afb0879
+cyw43 loaded ok, mac 88:a2:9e:d1:6d:9f
+API: 12.2
+Data: RaspberryPi.PicoW
+Compiler: 1.29.4
+ClmImport: 1.47.1
+Customization: v5 22/06/24
+Creation: 2022-06-24 06:55:08
+
+BT FW download, version = CYW4343A2_001.003.016.0031.0000_Generic_SDIO_37MHz_wlbga_BU_dl_signed
+[m
+[1;32muart:~$ [m[8D[J*** Booting Zephyr OS build v4.4.0-5745-g44af4534166b ***
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mConnecting to network "819 Paramount"
+Default interface is infineon_cyw43_module@0
+
+
+calling net_mgmt(NET_REQUEST_WIFI_CONNECT)
+0 Finished calling net_mgmt(NET_REQUEST_WIFI_SCAN)
+[8D[J[00:00:04.613,000] [0m<inf> net_config: Initializing network[0m
+[1;32muart:~$ [m[8D[J[00:00:04.613,000] [0m<inf> net_config: Waiting interface 1 (0x20000f60) to be up...[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m
+=== M0.0 console round-trip ===
+kernel version
+Zephyr version 4.4.99
+[1;32muart:~$ [m

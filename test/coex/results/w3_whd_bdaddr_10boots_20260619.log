@@ -1,0 +1,444 @@
+===== cold boot 1/10 2026-06-20T00:11:34Z =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+bt init
+[1;32muart:~$ [m[8D[JConnected
+[1;32muart:~$ [m[8D[J[00:00:07.394,000] [0m<inf> net_config: Initializing network[0m
+[1;32muart:~$ [m[8D[J[00:00:07.394,000] [0m<inf> net_config: Running dhcpv4 client...[0m
+[1;32muart:~$ [m[8D[J[00:00:07.447,000] [0m<inf> net_dhcpv4: Received: 192.168.4.28[0m
+[1;32muart:~$ [m[8D[J[00:00:07.448,000] [0m<inf> net_config: IPv4 address: 192.168.4.28[0m
+[1;32muart:~$ [m[8D[J[00:00:07.448,000] [0m<inf> net_config: Lease time: 14400 seconds[0m
+[1;32muart:~$ [m[8D[J[00:00:07.448,000] [0m<inf> net_config: Subnet: 255.255.252.0[0m
+[1;32muart:~$ [m[8D[J[00:00:07.448,000] [0m<inf> net_config: Router: 192.168.4.1[0m
+[1;32muart:~$ [m[8D[J[00:00:07.725,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.786,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:07.825,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:07.826,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.826,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:07.826,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt id-show
+*0: 88:A2:9E:D1:6D:A0 (public)
+[1;32muart:~$ [m
+>> cycle 1 addr = 88:A2:9E:D1:6D:A0
+===== cold boot 2/10 2026-06-20T00:11:52Z =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+bt init
+[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:07.722,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.784,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.822,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:07.822,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.822,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:07.822,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt id-show
+*0: 88:A2:9E:D1:6D:A0 (public)
+[1;32muart:~$ [m
+>> cycle 2 addr = 88:A2:9E:D1:6D:A0
+===== cold boot 3/10 2026-06-20T00:12:11Z =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+bt init
+[1;32muart:~$ [m[8D[JConnected
+[1;32muart:~$ [m[8D[J[00:00:07.394,000] [0m<inf> net_config: Initializing network[0m
+[1;32muart:~$ [m[8D[J[00:00:07.394,000] [0m<inf> net_config: Running dhcpv4 client...[0m
+[1;32muart:~$ [m[8D[J[00:00:07.463,000] [0m<inf> net_dhcpv4: Received: 192.168.4.28[0m
+[1;32muart:~$ [m[8D[J[00:00:07.463,000] [0m<inf> net_config: IPv4 address: 192.168.4.28[0m
+[1;32muart:~$ [m[8D[J[00:00:07.463,000] [0m<inf> net_config: Lease time: 14400 seconds[0m
+[1;32muart:~$ [m[8D[J[00:00:07.463,000] [0m<inf> net_config: Subnet: 255.255.252.0[0m
+[1;32muart:~$ [m[8D[J[00:00:07.463,000] [0m<inf> net_config: Router: 192.168.4.1[0m
+[1;32muart:~$ [m[8D[J[00:00:07.727,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.789,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:07.828,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:07.828,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.829,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:07.829,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt id-show
+*0: 88:A2:9E:D1:6D:A0 (public)
+[1;32muart:~$ [m
+>> cycle 3 addr = 88:A2:9E:D1:6D:A0
+===== cold boot 4/10 2026-06-20T00:12:29Z =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+bt init
+[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:07.722,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.783,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.822,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:07.822,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.822,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:07.822,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt id-show
+*0: 88:A2:9E:D1:6D:A0 (public)
+[1;32muart:~$ [m
+>> cycle 4 addr = 88:A2:9E:D1:6D:A0
+===== cold boot 5/10 2026-06-20T00:12:48Z =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+bt init
+[1;32muart:~$ [m[8D[JConnected
+[1;32muart:~$ [m[8D[J[00:00:07.307,000] [0m<inf> net_config: Initializing network[0m
+[1;32muart:~$ [m[8D[J[00:00:07.307,000] [0m<inf> net_config: Running dhcpv4 client...[0m
+[1;32muart:~$ [m[8D[J[00:00:07.354,000] [0m<inf> net_dhcpv4: Received: 192.168.4.28[0m
+[1;32muart:~$ [m[8D[J[00:00:07.355,000] [0m<inf> net_config: IPv4 address: 192.168.4.28[0m
+[1;32muart:~$ [m[8D[J[00:00:07.355,000] [0m<inf> net_config: Lease time: 14400 seconds[0m
+[1;32muart:~$ [m[8D[J[00:00:07.355,000] [0m<inf> net_config: Subnet: 255.255.252.0[0m
+[1;32muart:~$ [m[8D[J[00:00:07.355,000] [0m<inf> net_config: Router: 192.168.4.1[0m
+[1;32muart:~$ [m[8D[J[00:00:07.728,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.789,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:07.829,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:07.829,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.829,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:07.829,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt id-show
+*0: 88:A2:9E:D1:6D:A0 (public)
+[1;32muart:~$ [m
+>> cycle 5 addr = 88:A2:9E:D1:6D:A0
+===== cold boot 6/10 2026-06-20T00:13:06Z =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+bt init
+[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:07.730,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.791,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.830,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:07.830,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.830,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:07.830,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt id-show
+*0: 88:A2:9E:D1:6D:A0 (public)
+[1;32muart:~$ [m
+>> cycle 6 addr = 88:A2:9E:D1:6D:A0
+===== cold boot 7/10 2026-06-20T00:13:25Z =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+bt init
+[1;32muart:~$ [m[8D[JConnected
+[1;32muart:~$ [m[8D[J[00:00:07.293,000] [0m<inf> net_config: Initializing network[0m
+[1;32muart:~$ [m[8D[J[00:00:07.294,000] [0m<inf> net_config: Running dhcpv4 client...[0m
+[1;32muart:~$ [m[8D[J[00:00:07.367,000] [0m<inf> net_dhcpv4: Received: 192.168.4.28[0m
+[1;32muart:~$ [m[8D[J[00:00:07.367,000] [0m<inf> net_config: IPv4 address: 192.168.4.28[0m
+[1;32muart:~$ [m[8D[J[00:00:07.367,000] [0m<inf> net_config: Lease time: 14400 seconds[0m
+[1;32muart:~$ [m[8D[J[00:00:07.367,000] [0m<inf> net_config: Subnet: 255.255.252.0[0m
+[1;32muart:~$ [m[8D[J[00:00:07.367,000] [0m<inf> net_config: Router: 192.168.4.1[0m
+[1;32muart:~$ [m[8D[J[00:00:07.722,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.784,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:07.823,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:07.823,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.823,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:07.823,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt id-show
+*0: 88:A2:9E:D1:6D:A0 (public)
+[1;32muart:~$ [m
+>> cycle 7 addr = 88:A2:9E:D1:6D:A0
+===== cold boot 8/10 2026-06-20T00:13:44Z =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+bt init
+[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:07.729,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.791,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.829,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:07.830,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.830,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:07.830,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt id-show
+*0: 88:A2:9E:D1:6D:A0 (public)
+[1;32muart:~$ [m
+>> cycle 8 addr = 88:A2:9E:D1:6D:A0
+===== cold boot 9/10 2026-06-20T00:14:02Z =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+bt init
+[1;32muart:~$ [m[8D[JConnected
+[1;32muart:~$ [m[8D[J[00:00:07.370,000] [0m<inf> net_config: Initializing network[0m
+[1;32muart:~$ [m[8D[J[00:00:07.370,000] [0m<inf> net_config: Running dhcpv4 client...[0m
+[1;32muart:~$ [m[8D[J[00:00:07.422,000] [0m<inf> net_dhcpv4: Received: 192.168.4.28[0m
+[1;32muart:~$ [m[8D[J[00:00:07.422,000] [0m<inf> net_config: IPv4 address: 192.168.4.28[0m
+[1;32muart:~$ [m[8D[J[00:00:07.422,000] [0m<inf> net_config: Lease time: 14400 seconds[0m
+[1;32muart:~$ [m[8D[J[00:00:07.422,000] [0m<inf> net_config: Subnet: 255.255.252.0[0m
+[1;32muart:~$ [m[8D[J[00:00:07.422,000] [0m<inf> net_config: Router: 192.168.4.1[0m
+[1;32muart:~$ [m[8D[J[00:00:07.725,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.787,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:07.826,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:07.826,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.827,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:07.827,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt id-show
+*0: 88:A2:9E:D1:6D:A0 (public)
+[1;32muart:~$ [m
+>> cycle 9 addr = 88:A2:9E:D1:6D:A0
+===== cold boot 10/10 2026-06-20T00:14:21Z =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+bt init
+[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:07.729,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.791,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.829,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:07.830,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.830,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:07.830,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [mbt id-show
+*0: 88:A2:9E:D1:6D:A0 (public)
+[1;32muart:~$ [m
+>> cycle 10 addr = 88:A2:9E:D1:6D:A0
+===== SUMMARY =====
+88:A2:9E:D1:6D:A0
+88:A2:9E:D1:6D:A0
+88:A2:9E:D1:6D:A0
+88:A2:9E:D1:6D:A0
+88:A2:9E:D1:6D:A0
+88:A2:9E:D1:6D:A0
+88:A2:9E:D1:6D:A0
+88:A2:9E:D1:6D:A0
+88:A2:9E:D1:6D:A0
+88:A2:9E:D1:6D:A0
+distinct addresses: 1
+88:A2:9E:D1:6D:A0
+RESULT: STABLE across 10 cold boots

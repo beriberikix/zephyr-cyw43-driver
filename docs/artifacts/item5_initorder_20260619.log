@@ -1,0 +1,47 @@
+=== item 5: shared-power / init-order 2026-06-19T15:24:52Z ===
+### Scenario BT-only (no-autoconnect build, cold boot, no WiFi association) ###
+[wifi status before any BT/wifi op]
+State: DISCONNECTED
+[bt init]
+uart:~$ [8D[JBluetooth initialized
+uart:~$ [8D[J[00:00:10.425,000] <inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)
+uart:~$ [8D[J[00:00:10.556,000] <inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)
+[bt id-show]
+88:A2:9E:D1:6D:A0 (public)
+[bt advertise on]
+Advertising started
+[wifi status after BT up — expect still no association]
+State: DISCONNECTED
+### Scenario BT-then-WiFi (BT already up from above; now associate WiFi) ###
+[wifi connect]
+wifi connect -s "819 Paramount" -p "<REDACTED-PSK>" -k 1
+Connection requested
+uart:~$ [8D[JConnected
+[wifi status — expect COMPLETED]
+State: COMPLETED
+SSID: 819 Paramount
+BSSID: 84:70:D7:29:70:70
+[net iface — expect DHCP IP]
+	192.168.11.20/255.255.255.0 DHCP preferred
+IPv4 gateway : 192.168.11.1
+DHCPv4 server     : 192.168.11.1
+[bt still up? id-show + advertise still on]
+88:A2:9E:D1:6D:A0 (public)
+[uptime — alive]
+Uptime: 71934
+### Scenario WiFi-then-BT (normal autoconnect build, cold boot) ###
+[wifi status after boot auto-connect — expect COMPLETED]
+State: COMPLETED
+SSID: 819 Paramount
+[bt init after WiFi up]
+uart:~$ [8D[JBluetooth initialized
+uart:~$ [8D[J[00:00:13.493,000] <inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)
+[bt advertise on]
+Advertising started
+
+### Scenario shared-power cycling: BT advertising, cycle WiFi disconnect/connect x3 ###
+cycle 1: BT-after-disconnect=[88:A2:9E:D1:6D:A0] wifi-after-reconnect=[State: DISCONNECTED]
+cycle 2: BT-after-disconnect=[88:A2:9E:D1:6D:A0] wifi-after-reconnect=[State: DISCONNECTED]
+cycle 3: BT-after-disconnect=[88:A2:9E:D1:6D:A0] wifi-after-reconnect=[State: DISCONNECTED]
+[final: bt still advertising + alive]
+Uptime: 99917

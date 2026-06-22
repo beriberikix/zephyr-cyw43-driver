@@ -1,0 +1,39 @@
+W5 — WHD init/power-order matrix + WiFi-only   2026-06-20
+========================================================
+Board: rpi_pico2/rp2350a/m33/w   Debug Probe if01
+Build: build_whd  CONFIG_CYW43_TRANSPORT_WHD=y WIFI_AIROC=y BT=y
+       + test/coex/whd.conf stack fix (HW_STACK_PROTECTION + MAIN/SHELL/SYSWQ=4096)
+
+ROOT CAUSE of the earlier WiFi+BT fault: STACK OVERFLOW. The app defaults
+(CONFIG_MAIN_STACK_SIZE=2048, SHELL=2560) are too small for the WHD WiFi +
+cybt BT + coex call chains; under WiFi+BT it corrupted z_main_stack (PC in RAM,
+no clean dump). Fix: HW_STACK_PROTECTION=y (Cortex-M33 MPU, catches overflow
+cleanly) + 4096 stacks. With the fix, every init order is clean:
+
+--- ORDER 1: BT-only (WiFi never associated) ---
+bt init  -> controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)
+bt advertise on -> Advertising started
+liveness: ALIVE
+
+--- ORDER 2: WiFi -> BT ---
+wifi connect funrun -> Connected
+bt init -> BD_ADDR 88:A2:9E:D1:6D:A0 verified
+liveness: ALIVE   (previously FAULTED with default stacks)
+
+--- ORDER 3: BT -> WiFi ---
+bt init -> BD_ADDR 88:A2:9E:D1:6D:A0 verified
+wifi connect funrun -> Connected
+liveness: ALIVE
+
+--- BT survives WiFi disconnect ---
+wifi connect -> Connected; bt init -> BD_ADDR verified;
+wifi disconnect -> "Disconnection request done";  liveness: ALIVE
+=> BT not tied to WiFi association; shared WL_REG_ON not dropped (REFERENCE §2.4).
+
+--- WiFi-only WHD build ---
+build_whd -DCONFIG_BT=n links green (matrix).
+
+RESULT: W5 PASS — all init orders bring up clean, BT survives WiFi disconnect,
+WiFi-only green. (The stack overflow that caused the WiFi+BT fault is fixed; it
+was distinct from the BLE link-quality issue, which still blocks the W4/W6 soak
+throughput and is the only remaining item.)

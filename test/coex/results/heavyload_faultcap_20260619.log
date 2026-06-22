@@ -1,0 +1,200 @@
+===== faultcap cycle 1 =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+net ping -c 1000000 -i 25 8.8.8.8
+PING 8.8.8.8
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=2 ttl=115 time=30 ms
+[41D[J[00:00:08.804,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.805,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.805,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.805,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.805,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+[1;32muart:~$ [mnet[41D[J[1;32muart:~$ [mnetscanning for 'test-picow-bluetooth' / 88:A2:9E:D1:6D:A0 ...
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+connected; subscribing ...
+disconnected (teardown)
+=== BLE CENTRAL SUMMARY ===
+notifications: 842
+duration: 90.1s   rate: 9.3/s
+max inter-notify gap: 0.361s
+stalls over 3.0s: 0
+last counter value: 841
+unexpected disconnect: False
+RESULT: PASS
+----- gdb bt cycle 1 -----
+0x1002a556 in pio_sm_is_rx_fifo_empty (pio=<optimized out>, sm=<optimized out>) at /home/jonathan.beri@canonical.com/code/pico-coex/modules/hal/rpi_pico/src/rp2_common/hardware_pio/include/hardware/pio.h:1674
+1674	    return (pio->fstat & (1u << (PIO_FSTAT_RXEMPTY_LSB + sm))) != 0;
+available
+#0  0x1002a556 in pio_sm_is_rx_fifo_empty (pio=<optimized out>, sm=<optimized out>) at /home/jonathan.beri@canonical.com/code/pico-coex/modules/hal/rpi_pico/src/rp2_common/hardware_pio/include/hardware/pio.h:1674
+#1  spi_pico_pio_txrx_3_wire (dev=0x1003ca14 <__device_dts_ord_80>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/drivers/spi/spi_rpi_pico_pio.c:849
+#2  spi_pico_pio_txrx (dev=0x1003ca14 <__device_dts_ord_80>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/drivers/spi/spi_rpi_pico_pio.c:887
+#3  spi_pico_pio_transceive_impl (asynchronous=false, cb=0x0, userdata=0x0, dev=<optimized out>, spi_cfg=<optimized out>, tx_bufs=<optimized out>, rx_bufs=<optimized out>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/drivers/spi/spi_rpi_pico_pio.c:944
+#4  spi_pico_pio_transceive (dev=0x1003ca14 <__device_dts_ord_80>, spi_cfg=<optimized out>, tx_bufs=<optimized out>, rx_bufs=<optimized out>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/drivers/spi/spi_rpi_pico_pio.c:962
+#5  0x10008b3c in z_impl_spi_transceive (dev=<optimized out>, config=<optimized out>, tx_bufs=0x20001f18 <zephyr_cyw43_event_poll_stack+824>, rx_bufs=0x20001f20 <zephyr_cyw43_event_poll_stack+832>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/include/zephyr/drivers/spi.h:1037
+#6  spi_transceive (dev=<optimized out>, config=<optimized out>, tx_bufs=0x20001f18 <zephyr_cyw43_event_poll_stack+824>, rx_bufs=0x20001f20 <zephyr_cyw43_event_poll_stack+832>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/build_soak/zephyr/include/generated/zephyr/syscalls/spi.h:38
+#7  spi_transceive_dt (spec=<optimized out>, tx_bufs=0x20001f18 <zephyr_cyw43_event_poll_stack+824>, rx_bufs=0x20001f20 <zephyr_cyw43_event_poll_stack+832>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/include/zephyr/drivers/spi.h:1063
+#8  cyw43_spi_transfer (self=self@entry=0x20005268 <cyw43_state>, tx=tx@entry=0x0, tx_length=tx_length@entry=4, rx=<optimized out>, rx@entry=0x2000528c <cyw43_state+36> "\004\001", rx_length=260, rx_length@entry=264) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43_bus_pio_spi.c:216
+#9  0x10008cdc in cyw43_read_bytes (self=self@entry=0x20005268 <cyw43_state>, fn=fn@entry=2, addr=<optimized out>, len=260, buf=buf@entry=0x20005290 <cyw43_state+40> "\004\001\373\376\230\002") at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43_bus_pio_spi.c:422
+#10 0x100073a8 in cyw43_ll_sdpcm_poll_device (self=self@entry=0x20005268 <cyw43_state>, len=len@entry=0x20001f98 <zephyr_cyw43_event_poll_stack+952>, buf=buf@entry=0x20001f9c <zephyr_cyw43_event_poll_stack+956>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43-driver/src/cyw43_ll.c:1111
+#11 0x10007572 in cyw43_ll_process_packets (self_in=self_in@entry=0x20005268 <cyw43_state>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43-driver/src/cyw43_ll.c:1140
+#12 0x10008340 in cyw43_poll_func () at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43-driver/src/cyw43_ctrl.c:230
+#13 0x10006b6a in zephyr_cyw43_event_poll_thread (p1=<optimized out>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/zephyr_cyw43_drv.c:100
+#14 0x100099aa in z_thread_entry (entry=0x10006b3d <zephyr_cyw43_event_poll_thread>, p1=0x1003ca34 <__device_dts_ord_81>, p2=0x0, p3=0x0) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/kernel/sys/thread_entry.c:60
+pc             0x1002a556          0x1002a556 <spi_pico_pio_transceive+2174>
+[Inferior 1 (Remote target) detached]
+>>> cycle 1 alive
+===== faultcap cycle 2 =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+net ping -c 1000000 -i 25 8.8.8.8
+PING 8.8.8.8
+[41D[J[00:00:08.811,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.812,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.812,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.812,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.812,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+[1;32muart:~$ [mnet[41D[J[1;32muart:~$ [mnet28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=4 ttl=115 time=26 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=19 ttl=115 time=26 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=27 ttl=115 time=27 ms
+scanning for 'test-picow-bluetooth' / 88:A2:9E:D1:6D:A0 ...
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+connected; subscribing ...
+disconnected (teardown)
+=== BLE CENTRAL SUMMARY ===
+notifications: 793
+duration: 90.0s   rate: 8.8/s
+max inter-notify gap: 0.316s
+stalls over 3.0s: 0
+last counter value: 792
+unexpected disconnect: False
+RESULT: PASS
+----- gdb bt cycle 2 -----
+spi_pico_pio_txrx_3_wire (dev=0x1003ca14 <__device_dts_ord_80>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/drivers/spi/spi_rpi_pico_pio.c:849
+849				while ((!pio_sm_is_rx_fifo_empty(pio, data->pio_sm)) &&
+available
+#0  spi_pico_pio_txrx_3_wire (dev=0x1003ca14 <__device_dts_ord_80>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/drivers/spi/spi_rpi_pico_pio.c:849
+#1  spi_pico_pio_txrx (dev=0x1003ca14 <__device_dts_ord_80>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/drivers/spi/spi_rpi_pico_pio.c:887
+#2  spi_pico_pio_transceive_impl (asynchronous=false, cb=0x0, userdata=0x0, dev=<optimized out>, spi_cfg=<optimized out>, tx_bufs=<optimized out>, rx_bufs=<optimized out>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/drivers/spi/spi_rpi_pico_pio.c:944
+#3  spi_pico_pio_transceive (dev=0x1003ca14 <__device_dts_ord_80>, spi_cfg=<optimized out>, tx_bufs=<optimized out>, rx_bufs=<optimized out>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/drivers/spi/spi_rpi_pico_pio.c:962
+#4  0x10008b3c in z_impl_spi_transceive (dev=<optimized out>, config=<optimized out>, tx_bufs=0x20001f28 <zephyr_cyw43_event_poll_stack+840>, rx_bufs=0x20001f30 <zephyr_cyw43_event_poll_stack+848>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/include/zephyr/drivers/spi.h:1037
+#5  spi_transceive (dev=<optimized out>, config=<optimized out>, tx_bufs=0x20001f28 <zephyr_cyw43_event_poll_stack+840>, rx_bufs=0x20001f30 <zephyr_cyw43_event_poll_stack+848>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/build_soak/zephyr/include/generated/zephyr/syscalls/spi.h:38
+#6  spi_transceive_dt (spec=<optimized out>, tx_bufs=0x20001f28 <zephyr_cyw43_event_poll_stack+840>, rx_bufs=0x20001f30 <zephyr_cyw43_event_poll_stack+848>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/include/zephyr/drivers/spi.h:1063
+#7  cyw43_spi_transfer (self=self@entry=0x20005268 <cyw43_state>, tx=tx@entry=0x0, tx_length=tx_length@entry=4, rx=<optimized out>, rx@entry=0x20001f68 <zephyr_cyw43_event_poll_stack+904> "\024", rx_length=20, rx_length@entry=24) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43_bus_pio_spi.c:216
+#8  0x10008b96 in _cyw43_read_reg (self=self@entry=0x20005268 <cyw43_state>, fn=fn@entry=1, reg=<optimized out>, size=size@entry=4) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43_bus_pio_spi.c:324
+#9  0x100336ee in cyw43_read_reg_u32 (self=self@entry=0x20005268 <cyw43_state>, fn=fn@entry=1, reg=<optimized out>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43_bus_pio_spi.c:339
+#10 0x100330e2 in cyw43_read_reg (fn=1, self=0x20005268 <cyw43_state>, reg=40992, size=4) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43-driver/src/cyw43_ll.c:306
+#11 cyw43_read_backplane (self=self@entry=0x20005268 <cyw43_state>, addr=40992, addr@entry=402661408, size=size@entry=4) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43-driver/src/cyw43_ll.c:350
+#12 0x10008290 in cyw43_ll_bt_has_work (self_in=self_in@entry=0x20005268 <cyw43_state>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43-driver/src/cyw43_ll.c:2346
+#13 0x1000832c in cyw43_poll_func () at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/cyw43-driver/src/cyw43_ctrl.c:224
+#14 0x10006b6a in zephyr_cyw43_event_poll_thread (p1=<optimized out>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr-cyw43-driver/drivers/wifi/zephyr_cyw43/src/zephyr_cyw43_drv.c:100
+#15 0x100099aa in z_thread_entry (entry=0x10006b3d <zephyr_cyw43_event_poll_thread>, p1=0x1003ca34 <__device_dts_ord_81>, p2=0x0, p3=0x0) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/kernel/sys/thread_entry.c:60
+pc             0x1002a57e          0x1002a57e <spi_pico_pio_transceive+2214>
+[Inferior 1 (Remote target) detached]
+>>> cycle 2 alive
+===== faultcap cycle 3 =====
+Open On-Chip Debugger 0.12.0+dev (2025-10-09-12:15)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : [rp2350.cm0] Hardware thread awareness created
+Info : [rp2350.cm1] Hardware thread awareness created
+ocd_process_reset_inner
+adapter speed: 5000 kHz
+Info : Using CMSIS-DAPv2 interface with VID:PID=0x2e8a:0x000c, serial=E665485457925026
+Info : CMSIS-DAP: SWD supported
+Info : CMSIS-DAP: Atomic commands supported
+Info : CMSIS-DAP: Test domain timer supported
+Info : CMSIS-DAP: FW Version = 2.0.0
+Info : CMSIS-DAP: Interface Initialised (SWD)
+Info : SWCLK/TCK = 0 SWDIO/TMS = 0 TDI = 0 TDO = 0 nTRST = 0 nRESET = 0
+Info : CMSIS-DAP: Interface ready
+Info : clock speed 5000 kHz
+Info : SWD DPIDR 0x4c013477
+Info : [rp2350.cm0] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm0] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm0] Examination succeed
+Info : [rp2350.cm1] Cortex-M33 r1p0 processor detected
+Info : [rp2350.cm1] target has 8 breakpoints, 4 watchpoints
+Info : [rp2350.cm1] Examination succeed
+Info : [rp2350.cm0] starting gdb server on 3333
+Info : Listening on port 3333 for gdb connections
+net ping -c 1000000 -i 25 8.8.8.8
+PING 8.8.8.8
+[41D[J[00:00:08.807,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.807,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.807,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.807,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [mnet[41D[J[00:00:08.807,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+[1;32muart:~$ [mnet[41D[J[1;32muart:~$ [mnetscanning for 'test-picow-bluetooth' / 88:A2:9E:D1:6D:A0 ...
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+connected; subscribing ...
+disconnected (teardown)
+=== BLE CENTRAL SUMMARY ===
+notifications: 40
+duration: 4.2s   rate: 9.6/s
+max inter-notify gap: 0.225s
+stalls over 3.0s: 0
+last counter value: 39
+unexpected disconnect: False
+RESULT: PASS
+----- gdb bt cycle 3 -----
+__enable_irq () at /home/jonathan.beri@canonical.com/code/pico-coex/modules/hal/cmsis_6/CMSIS/Core/Include/cmsis_gcc.h:803
+803	    __ASM volatile ("cpsie i" : : : "memory");
+available
+#0  __enable_irq () at /home/jonathan.beri@canonical.com/code/pico-coex/modules/hal/cmsis_6/CMSIS/Core/Include/cmsis_gcc.h:803
+#1  arch_cpu_idle () at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/arch/arm/core/cortex_m/cpu_idle.c:104
+#2  0x1003aca4 in k_cpu_idle () at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/include/zephyr/kernel.h:6886
+#3  idle (unused1=<optimized out>, unused2=<optimized out>, unused3=<optimized out>) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/kernel/idle.c:75
+#4  0x100099aa in z_thread_entry (entry=0x1003ac91 <idle>, p1=0x20004c48 <_kernel>, p2=0x0, p3=0x0) at /home/jonathan.beri@canonical.com/code/pico-coex/zephyr/kernel/sys/thread_entry.c:60
+pc             0x10033854          0x10033854 <arch_cpu_idle+18>
+[Inferior 1 (Remote target) detached]
+>>> cycle 3 alive
+DONE

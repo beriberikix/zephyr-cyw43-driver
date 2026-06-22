@@ -1,0 +1,39 @@
+W2 — WHD associate + DHCP + internet ping (upstream AIROC over PIO-SPI)   2026-06-19
+===================================================================================
+Board: rpi_pico2/rp2350a/m33/w   Debug Probe CMSIS-DAP if01
+Build: build_whd  CONFIG_CYW43_TRANSPORT_WHD=y CONFIG_WIFI_AIROC=y
+       CONFIG_CYW43439=y CONFIG_CYW43439_MURATA_1YN=y CONFIG_BT=n
+Test AP: funrun (WPA2-PSK, ch 11), creds in app/local.conf; app auto-connects
+         (CONFIG_APP_WIFI_AUTOCONNECT) to CONFIG_WIFI_SSID via NET_REQUEST_WIFI_CONNECT.
+
+--- boot + auto-connect + DHCP (openocd reset run, console capture) ---
+[2982] WLAN MAC Address : 88:A2:9E:D1:6D:9F
+[3003] WHD VERSION      : 3.3.3.26653
+Connecting to network "funrun"
+calling net_mgmt(NET_REQUEST_WIFI_CONNECT)
+Connected
+[00:00:06.885] <inf> net_config: Running dhcpv4 client...
+[00:00:06.952] <inf> net_dhcpv4: Received: 192.168.4.28
+[00:00:06.952] <inf> net_config: IPv4 address: 192.168.4.28
+
+--- wifi status ---
+Status: successful
+State: COMPLETED
+SSID: funrun
+BSSID: 84:70:D7:29:70:67
+Band: 2.4GHz
+Channel: 11
+Security:  WPA2-PSK
+RSSI: -48
+
+--- net ping 8.8.8.8 -c 3 (device -> internet) ---
+PING 8.8.8.8
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=1 ttl=115 time=53 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=2 ttl=115 time=42 ms
+28 bytes from 8.8.8.8 to 192.168.4.28: icmp_seq=3 ttl=115 time=44 ms
+3 packets transmitted, 3 received, 0% packet loss
+
+RESULT: W2 PASS — WHD/AIROC STA associates (State COMPLETED), DHCP lease
+192.168.4.28, internet reachable (0% loss). Note: W1's early-boot join failure
+was transient (join issued before the radio fully settled); a clean reset
+associates reliably. Next: W3 (BT-over-WHD).

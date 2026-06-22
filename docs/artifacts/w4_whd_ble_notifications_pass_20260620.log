@@ -1,0 +1,27 @@
+W4 — WHD coex BLE notifications PASS (the final fix)   2026-06-20
+================================================================
+Build: build_whd_soak  CYW43_TRANSPORT_WHD + WIFI_AIROC + BT, all fixes:
+  - W6/1 shared gSPI bus lock (patches/airoc_whd_hal_spi_shared_bus_lock.patch)
+  - W6/2 cybt re-read instead of assert (patches/cybt_shared_bus_reread_index.patch)
+  - W5  HW_STACK_PROTECTION + MAIN/SHELL/SYSWQ stacks 4096 (whd.conf)
+  - THIS: soak.conf SYSTEM_WORKQUEUE_STACK_SIZE 2048 -> 4096
+
+FINAL ROOT CAUSE of the BLE early-disconnect: the BLE GATT/service-discovery
+work runs on the system workqueue; soak.conf set it to 2048 (already ~86% used
+before any BLE conn) and layered AFTER whd.conf, overriding the 4096 -> it
+overran during service discovery and the central dropped the link. The earlier
+"-92 dBm" was a symptom of the unstable BT path (assert/overflow), not a real
+TX-power deficit: once stable, WHD advertises at -61/-60 (= georgerobotics),
+WiFi off AND on.
+
+ble_central.py (WiFi associated to funrun + BLE central connected):
+  attempt 2: duration 24.9s  rate 9.9/s  max inter-notify gap 0.136s
+             stalls>3s: 0   notifications: 246   unexpected disconnect: False  PASS
+  attempt 3: duration 25.0s  rate 9.9/s  max inter-notify gap 0.137s
+             stalls>3s: 0   notifications: 495   unexpected disconnect: False  PASS
+  (attempt 1 "not found" = scan timing before the peripheral re-advertised)
+
+=> Full WiFi+BLE coexistence over the WHD stack now works: STA associated + BLE
+notify stream at 9.9/s (matches the georgerobotics 9.6/s envelope), 0 stalls, 0
+disconnects, 0 faults. Multi-cycle soak gate run next (W4) ->
+results/w4_whd_coex_soak_bounded_20260620.log.

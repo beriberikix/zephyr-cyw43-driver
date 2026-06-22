@@ -1,0 +1,52 @@
+W4/W6 — WHD coexistence characterization + shared-bus-lock fix    2026-06-19/20
+==============================================================================
+Board: rpi_pico2/rp2350a/m33/w   Debug Probe CMSIS-DAP if01
+Build: build_whd_soak  CONFIG_CYW43_TRANSPORT_WHD=y WIFI_AIROC=y BT=y
+       CONFIG_APP_BLE_PERIPHERAL=y (soak.conf)  FLASH 15.20%
+
+STEP 1 — characterize coex BEFORE the fix (BT-local lock only)
+--------------------------------------------------------------
+Boot: BT up over WHD bus at 3.3s (patchram), then
+   [14172] whd_wifi_join failed checkres=33555457
+   <err> infineon_airoc_wifi: Failed to connect with network
+=> WiFi association FAILS whenever the BT poll thread is active. In W2 (BT off)
+   WiFi associated cleanly (192.168.4.28). Root cause: the BT path drove gSPI
+   backplane transfers with a BT-LOCAL lock, unserialized against WHD's WLAN
+   bus thread (airoc_whd_hal_spi.c has no mutex). This is the REFERENCE §2.7
+   concurrent-bus corruption — here it manifests as a failed WLAN join rather
+   than a kernel panic, because cybt's reads now route through WHD's
+   F1-overflow-aware backplane path (so NO assert/panic: 0 faults).
+Soak (3 cyc bounded, results/w4_whd_coex_soak_3cyc_20260619.log):
+   cycles:3 faults:0  total notifications:0  (no coex established)
+
+STEP 2 — the W6 fix: shared gSPI bus lock
+-----------------------------------------
+A single recursive mutex now serializes ALL gSPI access:
+ - WHD WLAN: durable patch brackets whd_bus_spi_transfer() (incl. the
+   SPI_DATA_IRQ_SHARED pinctrl/IRQ toggle) — patches/airoc_whd_hal_spi_shared_bus_lock.patch
+ - BT: whd_bt_glue.c cyw43_thread_enter/exit -> whd_bus_lock/unlock (held across
+   each cybt read-modify-write sequence). Strong def in whd_transport.c.
+Boot AFTER the fix:
+   3.3s whd_bt_glue: BT up over WHD bus (patchram loaded)
+   "Connected"  (WiFi ASSOCIATED with BT active — previously failed)
+   ble_peripheral: Bluetooth initialized; starting advertising
+=> DEVICE-SIDE COEXISTENCE FIXED: WiFi + BT both up, 0 faults. The §2.7
+   contention that broke WLAN association is resolved.
+Soak (4 cyc bounded, results/w4w6_whd_coex_soak_4cyc_20260619.log):
+   cycles:4 faults:0  (no crash) BUT total notifications:0
+
+REMAINING BLOCKER (next): BLE not discoverable over-air
+-------------------------------------------------------
+Host BleakScanner.discover finds 6 BLE devices but NOT test-picow-bluetooth;
+ble_central.py -> "peripheral not found in scan". The device logs advertising
+with no error, but no ADV_IND is seen over-air, so the bleak central never
+connects (0 notifications). This is an HCI-level issue independent of the bus
+contention just fixed (candidates: HCI command-complete/event delivery during
+the advertising-setup sequence via the 4 ms BT RX poll; advertising
+params/data; BT TX-under-coex). Must be resolved before the coex soak can hit
+its notification baseline. W4 (parity soak) and W6 (2 h zero-fault gate) remain
+IN-PROGRESS pending this.
+
+NET: W6 shared-bus-lock fix = verified-good for the device-side §2.7 contention
+(0 faults, WiFi+BT coexist). Coex soak throughput is blocked downstream on BLE
+over-air discoverability.

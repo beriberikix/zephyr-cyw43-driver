@@ -1,0 +1,49 @@
+=== WHD BT bring-up intermittency — root-characterized as a per-boot ALTERNATION (2026-06-20) ===
+All on build_whd_soak (btc_mode coex fix in). Each trial: SWD reset, boot, BLE scan.
+
+## Discharge-timing candidate (WLAN_CBUCK_DISCHARGE_MS 10 -> 50 ms): RULED OUT
+   baseline 10ms: 5/8 discoverable (T,F,T,T,T,F,T,F)
+   fix    50ms: 4/8 discoverable (F,T,F,T,F,T,F,T)  -> no improvement
+
+## BT-only, WiFi autoconnect OFF (radio up, no association): 0/8 discoverable
+   => WHD-mode BT RF REQUIRES WiFi to be ASSOCIATED. With WiFi idle, BT never
+      advertises detectably (HCI/bt_enable still succeed). A real coex-ordering
+      dependency: the WiFi firmware sets up the shared RF/coex path at assoc.
+
+## WiFi-connect-gated BT start (wait for NET_EVENT_WIFI_CONNECT_RESULT +2s): RULED OUT
+   4/8 (F,T,F,T,F,T,F,T) with host-reset; 4/8 (F,T,F,T,F,T,F,T) WITHOUT host-reset
+   => gating BT on WiFi assoc does NOT fix it. Not an ordering/timing race.
+
+## KEY FINDING: deterministic PER-BOOT ALTERNATION
+   BT is discoverable on every OTHER SWD reset (perfect F,T,F,T,... across
+   consecutive boots), ~50%, INDEPENDENT of: the per-trial host bluetoothctl
+   reset (same with HOST_RESET=0), the discharge time (10 or 50 ms), and the
+   WiFi-gate. When BT IS up it is HEALTHY (-70 to -73 dBm) and sustains 593
+   notif/60s under load (separate PASS artifact).
+   => A CYW43 BT-core state that TOGGLES across SWD reset and is NOT cleared by
+      the AIROC firmware WL_REG_ON power-cycle (low/10ms or 50ms/high). Likely
+      needs a true/longer cold power-cycle to clear, OR exploit the determinism
+      with a harness reset-until-BT-discoverable (the next boot always flips to
+      working) to make the soak/2h gate reliable.
+
+## UPDATE: WL_REG_ON discharge 200 ms — STILL alternates (4/8, T,F,T,F,T,F,T,F)
+The toggling BT-core state survives a full 200 ms WL_REG_ON power-off, so discharge
+timing is CONCLUSIVELY ruled out and the toggle is deeper than chip power-down.
+=> Root fix likely needs a true USB power-cycle test (operator) to confirm whether
+   even that breaks it. Practical unblock = harness reset-until-BT-discoverable
+   (deterministic alternation => at most 1 extra reset to land in the working state).
+
+## DECISIVE (operator USB power-cycle, 2026-06-20): the alternation is an
+## SWD/WARM-RESET artifact, NOT a cold-boot/product defect.
+After a true USB power-cycle:
+  - Cold boot (power-on, NO SWD reset): BT discoverable = True (-79 dBm).
+  - Then SWD resets STILL alternate from there: F,T,F,T,F,T,F,T (4/8).
+=> A true power-on cold boot brings BT up WORKING. Each openocd `reset run` (warm
+   reset) is what toggles the BT-core state; a power-cycle clears it but the next
+   warm reset re-introduces it. So in PRODUCTION (power-on boot, no SWD reset) WHD
+   BT comes up clean; the ~50% "intermittency" was the per-cycle SWD reset in the
+   soak/btrate harness.
+IMPLICATION: W4/W6 soak just needs to NOT rely on SWD warm-reset for a clean BT
+boot — power-cycle, or reset-UNTIL-BT-discoverable (deterministic: <=1 extra
+reset). Open: whether a software/watchdog warm reboot in production also hits the
+toggle (a warm reboot resembles the SWD reset more than a cold boot).

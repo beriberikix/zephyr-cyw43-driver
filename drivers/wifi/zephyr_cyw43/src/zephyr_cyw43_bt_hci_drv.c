@@ -30,6 +30,10 @@ LOG_MODULE_REGISTER(bt_driver);
 
 #define MAX_BT_MSG_SIZE 2048
 
+/* Max packets to drain from the bt2host ring per process() call (bounds bus-lock
+ * hold time; any remainder is taken on the next poll). */
+#define CYW43_BT_DRAIN_MAX 32
+
 // cyw43_bluetooth_hci_write and cyw43_bluetooth_hci_read require a custom 4-byte packet header in front of the actual HCI packet
 // the HCI packet type is stored in the fourth byte of the packet header
 #define CYW43_PACKET_HEADER_SIZE 4
@@ -37,7 +41,8 @@ static uint8_t __noinit cyw43_rxbuf[MAX_BT_MSG_SIZE + CYW43_PACKET_HEADER_SIZE];
 static uint8_t __noinit cyw43_txbuf[CONFIG_NET_BUF_DATA_SIZE + CYW43_PACKET_HEADER_SIZE];
 
 struct zephyr_cyw43_bt_hci_data {
-	bt_hci_recv_t recv;
+	/* Must be first: the host stores its recv callback here via bt_hci_open(). */
+	struct bt_hci_driver_data common;
 };
 
 
@@ -50,154 +55,374 @@ static int zephyr_cyw43_bt_hci_init(const struct device *dev)
         return rv;
 }
 
-static int zephyr_cyw43_bt_hci_open(const struct device *dev, bt_hci_recv_t recv)
+static int zephyr_cyw43_bt_hci_open(const struct device *dev)
 {
-	int rv = 0;	
-	struct zephyr_cyw43_bt_hci_data *hci_data = dev->data;
-	
-	hci_data->recv = recv;
-	
-	return rv;
+	/*
+	 * The current Zephyr HCI model stores the host recv callback in
+	 * dev->data (struct bt_hci_driver_data) before calling open(); RX is
+	 * delivered with bt_hci_recv(). The controller transport is already
+	 * brought up in zephyr_cyw43_bt_hci_init(), so there is nothing more to
+	 * do here.
+	 */
+	ARG_UNUSED(dev);
+
+	return 0;
 }
 
 static int zephyr_cyw43_bt_hci_close(const struct device *dev)
 {
-	int rv = 0;
-	struct zephyr_cyw43_bt_hci_data *hci_data = dev->data;
-	
-	hci_data->recv = NULL;
-	
-	return rv;
+	ARG_UNUSED(dev);
+
+	return 0;
 }
 
-void cyw43_bluetooth_hci_process(void) {
-	
-	struct net_buf *buf=NULL;
+static void cyw43_bt_process_one(void)
+{
+	struct net_buf *buf = NULL;
 	bool discardable = false;
 	k_timeout_t timeout = K_FOREVER;
 	struct bt_hci_acl_hdr acl_hdr = { .len = 0 };
-	struct bt_hci_iso_hdr iso_hdr = { .len = 0 };
-	uint32_t cyw43_len;
-	uint32_t len;
+	uint32_t cyw43_len = 0;
+	uint32_t pkt_len;	/* bytes available from rxmsg[0]: type + payload */
+	uint32_t avail;		/* HCI payload bytes available after the type byte */
+	uint32_t len;		/* parsed HCI packet length (header + payload) */
 	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
-	struct zephyr_cyw43_bt_hci_data *hci_data = dev->data;
 	uint8_t packet_type;
 	uint8_t *rxmsg;
-	
-        LOG_DBG("Entering cyw43_bluetooth_hci_process()");
-	
-	cyw43_bluetooth_hci_read(&cyw43_rxbuf[0], MAX_BT_MSG_SIZE, &cyw43_len);
+	int ret;
+
+	LOG_DBG("Entering cyw43_bluetooth_hci_process()");
+
+	/* Robustness: the read can fail (bus error / controller not up). On
+	 * failure *len is not meaningful, so do not parse stale buffer data. */
+	ret = cyw43_bluetooth_hci_read(&cyw43_rxbuf[0], MAX_BT_MSG_SIZE, &cyw43_len);
+	if (ret) {
+		LOG_ERR("cyw43_bluetooth_hci_read failed (ret %d)", ret);
+		return;
+	}
+
+	/* cyw43_len counts the full 4-byte cyw43 header; the last header byte
+	 * (index CYW43_PACKET_HEADER_SIZE-1) is the H4 packet type, followed by
+	 * the HCI packet. Need at least that type byte, and it must fit the RX
+	 * buffer (guards an underflow in the pkt_len computation below). */
+	if (cyw43_len < CYW43_PACKET_HEADER_SIZE || cyw43_len > sizeof(cyw43_rxbuf)) {
+		LOG_WRN("bogus cyw43 RX length %u", cyw43_len);
+		return;
+	}
 
 	rxmsg = &cyw43_rxbuf[CYW43_PACKET_HEADER_SIZE - 1];
 	packet_type = rxmsg[PACKET_TYPE];
-	len = cyw43_len - (CYW43_PACKET_HEADER_SIZE - 1);
-		
-	LOG_HEXDUMP_DBG(rxmsg, len, "HCI RX data:");
-	LOG_DBG("cyw43_bluetooth_hci_process(), len = %d", len);
-	LOG_DBG("cyw43_bluetooth_hci_process(): packet_type = %d", packet_type);
-	
+	pkt_len = cyw43_len - (CYW43_PACKET_HEADER_SIZE - 1);
+	avail = pkt_len - PACKET_TYPE_SIZE;
+
+	LOG_HEXDUMP_DBG(rxmsg, pkt_len, "HCI RX data:");
+	LOG_DBG("cyw43 RX: type=%u pkt_len=%u", packet_type, pkt_len);
+
 	switch (packet_type) {
 	case BT_HCI_H4_EVT:
+		if (avail < sizeof(struct bt_hci_evt_hdr)) {
+			LOG_WRN("EVT too short: %u", avail);
+			return;
+		}
 		if (rxmsg[EVT_HEADER_EVENT] == BT_HCI_EVT_LE_META_EVENT &&
 		    (rxmsg[EVT_LE_META_SUBEVENT] == BT_HCI_EVT_LE_ADVERTISING_REPORT)) {
 			discardable = true;
 			timeout = K_NO_WAIT;
 		}
-		buf = bt_buf_get_evt(rxmsg[EVT_HEADER_EVENT],
-				     discardable, timeout);
+		buf = bt_buf_get_evt(rxmsg[EVT_HEADER_EVENT], discardable, timeout);
 		len = sizeof(struct bt_hci_evt_hdr) + rxmsg[EVT_HEADER_SIZE];
-		LOG_DBG("EVT len = %d", len);
 		break;
 	case BT_HCI_H4_ACL:
+		if (avail < sizeof(struct bt_hci_acl_hdr)) {
+			LOG_WRN("ACL too short: %u", avail);
+			return;
+		}
 		buf = bt_buf_get_rx(BT_BUF_ACL_IN, timeout);
 		memcpy(&acl_hdr, &rxmsg[1], sizeof(acl_hdr));
 		len = sizeof(struct bt_hci_acl_hdr) + sys_le16_to_cpu(acl_hdr.len);
-		LOG_DBG("ACL len = %d", len);
-		if (buf != NULL && len > net_buf_tailroom(buf)) {
-			LOG_ERR("ACL too long: %d", len);
-			net_buf_unref(buf);
+		break;
+#if defined(CONFIG_BT_ISO)
+	case BT_HCI_H4_ISO: {
+		struct bt_hci_iso_hdr iso_hdr;
+
+		if (avail < sizeof(struct bt_hci_iso_hdr)) {
+			LOG_WRN("ISO too short: %u", avail);
 			return;
 		}
-
-		break;
-	case BT_HCI_H4_ISO:
-	case BT_HCI_H4_SCO:
 		buf = bt_buf_get_rx(BT_BUF_ISO_IN, timeout);
 		memcpy(&iso_hdr, &rxmsg[1], sizeof(iso_hdr));
-		len = sizeof(struct bt_hci_iso_hdr) + bt_iso_hdr_len(sys_le16_to_cpu(iso_hdr.len));
-		LOG_DBG("ISO len = %d", len);
+		len = sizeof(struct bt_hci_iso_hdr) +
+		      bt_iso_hdr_len(sys_le16_to_cpu(iso_hdr.len));
 		break;
+	}
+#endif /* CONFIG_BT_ISO */
+	case BT_HCI_H4_SCO:
+		/*
+		 * Classic SCO (synchronous audio) has a different header and
+		 * buffer type than ISO and is out of scope for WiFi+BLE
+		 * coexistence; the CYW43 BLE path never delivers it. Drop it
+		 * here rather than mis-parsing it as ISO (the previous code
+		 * conflated the two, using BT_BUF_ISO_IN and bt_hci_iso_hdr for
+		 * SCO).
+		 */
+		LOG_WRN("dropping unsupported SCO packet (cyw43_len %u)", cyw43_len);
+		return;
 	default:
-		buf = NULL;
-		len = 0;
-		break;
+		LOG_WRN("unknown H4 RX packet type 0x%02x", packet_type);
+		return;
 	}
 
-	if (len == 0) {
-		LOG_WRN("Unknown BT buf type %d", rxmsg[PACKET_TYPE]);
+	/*
+	 * Backpressure / exhaustion policy: bt_buf_get_evt()/bt_buf_get_rx() can
+	 * return NULL when the pool is exhausted, and bt_buf_get_evt() returns
+	 * NULL by design for a discardable advertising report under K_NO_WAIT.
+	 * Drop the packet instead of dereferencing NULL. (For non-discardable
+	 * traffic the timeout is K_FOREVER, so NULL here means a genuine
+	 * allocation failure worth flagging.)
+	 */
+	if (buf == NULL) {
+		if (discardable) {
+			LOG_DBG("dropped discardable advertising report (no buf)");
+		} else {
+			LOG_WRN("no RX buf for type 0x%02x; dropping", packet_type);
+		}
+		return;
 	}
-	else {
-		net_buf_add_mem(buf, &rxmsg[1], len);
-		hci_data->recv(dev, buf);
+
+	/*
+	 * Length bounds: the HCI length field must be consistent with the bytes
+	 * we actually received and must fit the destination buffer, or we would
+	 * over-read cyw43_rxbuf / overflow the net_buf.
+	 */
+	if (len > avail) {
+		LOG_ERR("HCI len %u exceeds received payload %u (type 0x%02x)",
+			len, avail, packet_type);
+		net_buf_unref(buf);
+		return;
 	}
-	LOG_DBG("Leaving cyw43_bluetooth_hci_process()\n");
-	
-	return;
+	if (len > net_buf_tailroom(buf)) {
+		LOG_ERR("HCI len %u exceeds buf tailroom %zu (type 0x%02x)",
+			len, net_buf_tailroom(buf), packet_type);
+		net_buf_unref(buf);
+		return;
+	}
+
+	net_buf_add_mem(buf, &rxmsg[1], len);
+	bt_hci_recv(dev, buf);
+
+	LOG_DBG("Leaving cyw43_bluetooth_hci_process()");
+}
+
+/*
+ * Is there unread BT data in the controller's bt2host buffer?
+ *
+ * cyw43_ll_bt_has_work() only tests the I_HMB_FC_CHANGE interrupt flag in
+ * SDIO_INT_STATUS. The WiFi SDPCM path (cyw43_ll_process_packets) reads the same
+ * register and clears the whole I_HMB_SW_MASK (0xf0), which INCLUDES
+ * I_HMB_FC_CHANGE (bit 5). So under concurrent WiFi+BT the WiFi side can clear
+ * the BT flow-control flag before BT reads it, and an HCI command-complete then
+ * sits in the bt2host ring undetected -> bt_hci_cmd_send_sync() "Controller
+ * unresponsive". This checks the actual ring indices (the source of truth),
+ * independent of that flag, so the poll loop can drain BT regardless.
+ */
+bool cyw43_bluetooth_has_pending(void)
+{
+	cybt_fw_membuf_index_t idx;
+
+	if (!cyw43_state.bt_loaded) {
+		return false;
+	}
+	if (cybt_get_bt_buf_index(&idx) != CYBT_SUCCESS) {
+		return false;
+	}
+	return idx.bt2host_in_val != idx.bt2host_out_val;
+}
+
+/*
+ * Drain the controller's bt2host ring fully (called from the cyw43 poll loop
+ * when cyw43_ll_bt_has_work() reports BT data).
+ *
+ * I_HMB_FC_CHANGE has edge semantics: the controller asserts it when BT data
+ * becomes available, and cyw43_ll_bt_has_work() clears it after we read. If the
+ * controller batched several HCI packets under one assertion (e.g. a connection
+ * event plus the command-complete the host is blocked on in
+ * bt_hci_cmd_send_sync), reading only one leaves the rest stranded until the
+ * next assertion -> "Controller unresponsive" command timeout. So read every
+ * packet currently queued, staying on the normal cybt_hci_read() path so its
+ * internal book-keeping stays consistent. Bounded so a controller streaming
+ * without pause cannot hold the bus lock indefinitely.
+ */
+void cyw43_bluetooth_hci_process(void)
+{
+	int i = 0;
+
+	do {
+		cyw43_bt_process_one();
+	} while (cyw43_bluetooth_has_pending() && ++i < CYW43_BT_DRAIN_MAX);
 }
 
 static int zephyr_cyw43_bt_hci_send(const struct device *dev, struct net_buf *buf)
 {
-	int rv=0;
-	
-	uint8_t packet_type = BT_HCI_H4_NONE;
+	int rv = 0;
+	uint8_t packet_type;
 	uint32_t cyw43_len = 0;
-	
-	LOG_DBG("zephyr_cyw43_bt_hci_send() bt_buf_get_type() = %s",
-		(bt_buf_get_type(buf) == BT_BUF_CMD ? "BT_BUF_CMD" :
-		 (bt_buf_get_type(buf) == BT_BUF_EVT ? "BT_BUF_EVT" :
-		  (bt_buf_get_type(buf) == BT_BUF_ACL_OUT ? "BT_BUF_ACL_OUT" :
-		   (bt_buf_get_type(buf) == BT_BUF_ISO_OUT ? "BT_BUF_ISO_OUT" :
-		    "Unknown")))));
-	
-	switch (bt_buf_get_type(buf)) {
-	case BT_BUF_CMD:
-		packet_type = BT_HCI_H4_CMD;
-		break;		
-	case BT_BUF_EVT:
-		packet_type = BT_HCI_H4_EVT;
-		break;
-	case BT_BUF_ACL_OUT:
-		packet_type = BT_HCI_H4_ACL;
-		break;
-	case BT_BUF_ISO_OUT:
-		packet_type = BT_HCI_H4_ISO;
+
+	ARG_UNUSED(dev);
+
+	/*
+	 * In the current Zephyr HCI model the host hands us a buffer whose first
+	 * byte is the H:4 packet-type indicator (BT_HCI_H4_CMD/ACL/ISO). The
+	 * CYW43 shared-bus write wants that same indicator in the 4th byte of
+	 * its 4-byte header, immediately followed by the rest of the buffer, so
+	 * we can copy buf->data verbatim starting at the indicator slot.
+	 */
+	if (buf->len < 1) {
+		LOG_ERR("zero-length HCI TX buffer");
+		rv = -EINVAL;
+		goto out;
+	}
+
+	packet_type = buf->data[0];
+
+	switch (packet_type) {
+	case BT_HCI_H4_CMD:
+	case BT_HCI_H4_ACL:
+	case BT_HCI_H4_ISO:
 		break;
 	default:
+		LOG_ERR("Unknown H4 TX packet type 0x%02x", packet_type);
 		rv = -EINVAL;
-		break;
+		goto out;
 	}
-	
-	if ((packet_type != BT_HCI_H4_NONE)) {
-		net_buf_push_u8(buf, packet_type);
 
-		memcpy(&cyw43_txbuf[CYW43_PACKET_HEADER_SIZE-1], buf->data, buf->len);
-		cyw43_len = buf->len + CYW43_PACKET_HEADER_SIZE;
-				
-		LOG_DBG("Calling cyw43_bluetooth_hci_write()");
-		rv = cyw43_bluetooth_hci_write(cyw43_txbuf, cyw43_len);
-		LOG_DBG("cyw43_bluetooth_hci_write() rv=%d", rv);
-		LOG_HEXDUMP_DBG(buf->data, buf->len, "HCI TX data:");
-		LOG_DBG("zephyr_cyw43_bt_hci_send(), len = %d\n", buf->len);		
-	}	
-	net_buf_unref(buf);	
+	if (buf->len + (CYW43_PACKET_HEADER_SIZE - 1) > sizeof(cyw43_txbuf)) {
+		LOG_ERR("HCI TX buffer too long: %u", buf->len);
+		rv = -EMSGSIZE;
+		goto out;
+	}
+
+	memcpy(&cyw43_txbuf[CYW43_PACKET_HEADER_SIZE - 1], buf->data, buf->len);
+	cyw43_len = buf->len + CYW43_PACKET_HEADER_SIZE;
+
+	LOG_DBG("Calling cyw43_bluetooth_hci_write() type=0x%02x", packet_type);
+	/*
+	 * Bus-arbitration invariant: WiFi (cyw43_ll) and BT
+	 * (cybt_shared_bus) share one gSPI bus, serialized by the cyw43
+	 * bus mutex (cyw43_thread_enter/exit == zephyr_cyw43_lock). The
+	 * poll thread holds it around every read (cyw43_poll); WiFi mgmt
+	 * ops hold it around every transfer. But cyw43_bluetooth_hci_write()
+	 * is the ONE bus path the georgerobotics code does NOT wrap in
+	 * CYW43_THREAD_ENTER, so a BT HCI TX from the host's bt_tx_processor
+	 * thread would issue SPI transactions concurrently with the poll
+	 * thread. The cyw43 bus code yields/sleeps mid-transfer
+	 * (CYW43_EVENT_POLL_HOOK k_yield, CYW43_SDPCM_SEND_COMMON_WAIT
+	 * k_sleep), so even cooperative threads interleave: the controller's
+	 * shared-memory ring indices read back corrupt (>= BTSDIO_FWBUF_SIZE)
+	 * -> cybt assert -> panic. Hold the bus lock for the write. The
+	 * mutex is recursive with priority inheritance, so the higher-prio
+	 * poll thread is not inverted while we hold it.
+	 */
+	cyw43_thread_enter();
+	rv = cyw43_bluetooth_hci_write(cyw43_txbuf, cyw43_len);
+	cyw43_thread_exit();
+	LOG_DBG("cyw43_bluetooth_hci_write() rv=%d", rv);
+	LOG_HEXDUMP_DBG(buf->data, buf->len, "HCI TX data:");
+	LOG_DBG("zephyr_cyw43_bt_hci_send(), len = %d\n", buf->len);
+
+out:
+	net_buf_unref(buf);
 	return rv;
 }
 
 #if defined(CONFIG_BT_HCI_SETUP)
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/addr.h>
+
+/*
+ * Derive the expected BT public address from the WiFi MAC.
+ *
+ * The CYW43 controller derives its BT BD_ADDR from the WiFi MAC + 1 (the WiFi
+ * MAC is read from OTP at cyw43 init and cached in cyw43_state.mac). The MAC is
+ * a 48-bit big-endian value (mac[0] is the most-significant octet), so "+1"
+ * increments from the last octet with carry. bt_addr_t stores the address
+ * little-endian (val[0] is the least-significant octet).
+ */
+static void cyw43_expected_bt_addr(bt_addr_t *out)
+{
+	uint8_t mac[6];
+	int i;
+
+	memcpy(mac, cyw43_state.mac, sizeof(mac));
+
+	for (i = 5; i >= 0; i--) {
+		if (++mac[i] != 0U) {
+			break;
+		}
+	}
+
+	for (i = 0; i < 6; i++) {
+		out->val[i] = mac[5 - i];
+	}
+}
+
+/*
+ * HCI vendor/controller setup hook (runs during bt_enable, after HCI Reset).
+ *
+ * The CYW43 BT firmware is already downloaded by the shared-bus transport in
+ * zephyr_cyw43_bt_hci_init(), and the controller exposes a valid OTP-derived
+ * public address, so there is no vendor command we must issue to make the
+ * controller usable. What we DO here is a "known controller init" sanity check:
+ * read the controller's BD_ADDR and verify it is the expected WiFi-MAC+1 public
+ * address. A zero/broadcast or mismatched address is surfaced loudly rather
+ * than silently shipping a wrong identity. This is intentionally read-only to
+ * avoid perturbing a controller that already reports the correct address.
+ */
 static int zephyr_cyw43_bt_hci_setup(const struct device *dev,
 				  const struct bt_hci_setup_params *param)
 {
-	LOG_DBG("zephyr_cyw43_bt_hci_setup() not implemented");
+	struct bt_hci_rp_read_bd_addr *rp;
+	struct net_buf *rsp = NULL;
+	bt_addr_t expected;
+	char got_s[BT_ADDR_STR_LEN];
+	char exp_s[BT_ADDR_STR_LEN];
+	int err;
+
+	ARG_UNUSED(dev);
+	ARG_UNUSED(param);
+
+	err = bt_hci_cmd_send_sync(BT_HCI_OP_READ_BD_ADDR, NULL, &rsp);
+	if (err) {
+		LOG_ERR("HCI Read_BD_ADDR failed (err %d)", err);
+		return err;
+	}
+
+	rp = (void *)rsp->data;
+	if (rp->status) {
+		LOG_ERR("HCI Read_BD_ADDR status 0x%02x", rp->status);
+		net_buf_unref(rsp);
+		return -EIO;
+	}
+
+	cyw43_expected_bt_addr(&expected);
+	bt_addr_to_str(&rp->bdaddr, got_s, sizeof(got_s));
+	bt_addr_to_str(&expected, exp_s, sizeof(exp_s));
+
+	if (bt_addr_eq(&rp->bdaddr, BT_ADDR_ANY) ||
+	    bt_addr_eq(&rp->bdaddr, BT_ADDR_NONE)) {
+		LOG_ERR("controller reported invalid public BD_ADDR %s", got_s);
+		net_buf_unref(rsp);
+		return -EIO;
+	}
+
+	if (!bt_addr_eq(&rp->bdaddr, &expected)) {
+		LOG_WRN("controller public BD_ADDR %s != expected WiFi-MAC+1 %s",
+			got_s, exp_s);
+	} else {
+		LOG_INF("controller public BD_ADDR %s verified (= WiFi MAC + 1)",
+			got_s);
+	}
+
+	net_buf_unref(rsp);
 	return 0;
 }
 

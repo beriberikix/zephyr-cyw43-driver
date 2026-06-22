@@ -1,0 +1,25 @@
+=== W6 ~101s load drop — ROOT CAUSE: WHD packet-buffer pool exhaustion (2026-06-20) ===
+UART captured through the drop (diag101) shows, repeating:
+  Packet buffer allocation failed in whd_bus_transfer_backplane_bytes at 349
+  Function whd_bus_transfer_backplane_bytes failed at line 425 checkres=33555470
+
+The airoc_pool (zephyr/drivers/wifi/infineon/airoc_wifi.c:
+  NET_BUF_POOL_FIXED_DEFINE(airoc_pool, 20, 1600)) is shared by WiFi RX/TX AND
+  every BT backplane transfer. Under moderate WiFi load it DRAINS; once empty the
+  BT backplane alloc fails -> BT RX/TX dies -> BLE link drops. The BT path is the
+  VICTIM, not the leaker.
+
+Pool-size scaling (drain, not transient contention):
+  pool 20: drop ~101s   |   pool 48 (24+24): drop ~185s
+
+Leak SITE not yet pinned. Ruled out:
+  - airoc_mgmt_send TX error path: added a release on send-failure -> did NOT
+    help (dropped 76.9s); reverted (also a possible double-free if WHD frees).
+  - whd_bus_transfer_backplane_bytes (whd_bus_common.c): RELEASES pkt_buffer via
+    its 'done:' path (lines 420-423); the 'failed at 425' is CHECK_RETURN(result)
+    AFTER the release = a symptom of the empty pool, not the leak.
+  - RX process_ethernet_data: releases the WHD buffer (line 433).
+  => leak is likely a WHD-internal RX/IOCTL/event path, or a subtler accounting
+     issue. NEXT: instrument airoc_wifi_host_buffer_get/airoc_wifi_buffer_release
+     with alloc/release counters (per direction) + log net_buf_avail under load to
+     localize; then fix, or use a larger pool as a bounded-load mitigation.

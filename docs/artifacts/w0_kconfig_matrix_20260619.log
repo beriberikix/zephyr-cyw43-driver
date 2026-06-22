@@ -1,0 +1,52 @@
+W0 — CYW43_TRANSPORT switch + branch setup (whd-port)            2026-06-19
+=========================================================================
+Goal: introduce a build-time transport choice (georgerobotics default / WHD
+port) without disturbing the proven stack; lift the §1 EULA-blob constraint
+for this branch; fetch the WHD 43439 firmware; prove the proven stack still
+boots.  Hardware: rpi_pico2/rp2350a/m33/w, Debug Probe CMSIS-DAP if01.
+
+BUILD MATRIX (west build -p always, board rpi_pico2/rp2350a/m33/w)
+-----------------------------------------------------------------
+1. georgerobotics, WiFi+BT  (build_pico2, default transport)      PASS
+     FLASH 594092 B  14.16%   RAM 121768 B  22.87%   uf2 1188352 B
+2. georgerobotics, WiFi-only (build_wifionly, -DCONFIG_BT=n)      PASS
+     FLASH 509056 B  12.14%   RAM  95664 B  17.97%
+3. WHD, WiFi-only (build_whd, -DCONFIG_CYW43_TRANSPORT_WHD=y -DCONFIG_BT=n)  PASS
+     FLASH 264020 B   6.29%   RAM  88328 B  16.59%   uf2 528384 B
+     (placeholder WHD backend + WiFi subsystem, no driver device yet — W1)
+
+DEFERRED (documented, not a regression):
+4. WHD, WiFi+BT  — link fails by design:
+     ld: subsys/bluetooth/host hci_core.c: undefined reference to
+         __device_dts_ord_82   (the cyw43 bt_hci device is not compiled in
+         WHD mode; BT-over-WHD = the cybt transport re-arbitrated onto the
+         WHD lock is milestone W3). WHD mode is WiFi-only until W3.
+
+BOOT SMOKE — proven georgerobotics stack still runs after the CMake/Kconfig reorg
+--------------------------------------------------------------------------------
+flash: openocd program build_pico2/zephyr/zephyr.elf verify reset exit
+   ** Verified OK **   ** Resetting Target **
+gdb liveness (reset run, 4 s, halt):
+   RUNNING_PC=0x10035c5c   (in FLASH, not arch_system_halt)
+   #0 __enable_irq ()            cmsis_gcc.h:803
+   #1 arch_cpu_idle ()           cpu_idle.c:104
+   #2 k_cpu_idle ()              kernel.h:6886
+   #3 idle ()                    idle.c:75
+   #4 z_thread_entry ()          thread_entry.c:60
+   => image boots to the idle thread normally; build-system reorg is inert.
+
+INFINEON BLOBS (§1 EULA lift, decision 2026-06-19)
+--------------------------------------------------
+west blobs fetch hal_infineon  -> OK
+   43439A0.bin           249066 B   status A (present)   <- WHD WiFi fw, W1
+   COMPONENT_MURATA-1YN/43439A0.clm_blob          status A (present)
+   (also present on disk: img/bluetooth/firmware/COMPONENT_43439/
+    COMPONENT_MURATA-1YN/bt_firmware.hcd — alt BT patchram, noted for W3)
+
+RESULT: W0 PASS — transport switch in place, proven stack green + booting,
+WHD WiFi-only links, 43439 WHD firmware fetched. Next: W1 (WHD WiFi scan).
+
+NOTE (loop gotcha extended): the PROBE GUARD `pkill -f '[g]db'` self-kills any
+shell whose command text contains the literal "gdb" (e.g. a gdb binary path) —
+exit 144 — because -f matches the whole command line, not just the pattern.
+For gdb cleanup rely on `-batch` (exits itself) and guard only `pkill -x openocd`.

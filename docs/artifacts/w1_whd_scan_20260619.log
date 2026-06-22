@@ -1,0 +1,32 @@
+W1 — WHD WiFi-only scan (upstream AIROC driver over RP2350 PIO-SPI)   2026-06-19
+==============================================================================
+Board: rpi_pico2/rp2350a/m33/w   Debug Probe CMSIS-DAP if01
+Build: build_whd  CONFIG_CYW43_TRANSPORT_WHD=y CONFIG_WIFI_AIROC=y
+       CONFIG_CYW43439=y CONFIG_CYW43439_MURATA_1YN=y CONFIG_BT=n
+       FLASH 575364 B 13.72%  RAM 129120 B 24.25%  (incl. .incbin 43439A0.bin)
+Overlay: app/boards/<board>.overlay (georgerobotics, auto) + test/coex/whd.overlay
+         (re-deletes pio0_spi0, restores stock infineon,airoc-wifi node)
+
+Resolves R1: WHD's whd_bus_spi_transfer (spi_transceive_dt, SPI_HALF_DUPLEX,
+spi-data-irq-shared on GP24) works over the upstream raspberrypi,pico-spi-pio
+controller. whd_init/whd_bus_spi_attach/whd_wifi_on succeeded (firmware
+downloaded over the bus; a join was even attempted from main.c).
+
+--- wifi scan (console, real over-the-air result) ---
+Num  | SSID                             (len) | Chan (Band)   | RSSI | Security             | BSSID             | MFP     
+uart:~$ 2    | la casa rodriguez                17    | 8    (2.4GHz) | -76  | WPA/WPA2/WPA3 PSK    | 18:A5:FF:23:69:00 | Disable 
+uart:~$ 3    | funrun                           6     | 11   (2.4GHz) | -86  | WPA/WPA2/WPA3 PSK    | 84:70:D7:3A:25:67 | Disable 
+uart:~$ 4    | 819 Paramount                    13    | 11   (2.4GHz) | -85  | WPA/WPA2/WPA3 PSK    | 84:70:D7:3A:25:70 | Disable 
+uart:~$ 5    | funrun                           6     | 11   (2.4GHz) | -63  | WPA/WPA2/WPA3 PSK    | 84:70:D7:4A:4E:E7 | Disable 
+uart:~$ 6    | 819 Paramount                    13    | 11   (2.4GHz) | -62  | WPA/WPA2/WPA3 PSK    | 84:70:D7:4A:4E:F0 | Disable 
+uart:~$ 7    | funrun                           6     | 11   (2.4GHz) | -49  | WPA/WPA2/WPA3 PSK    | 84:70:D7:29:70:67 | Disable 
+uart:~$ 8    | 819 Paramount                    13    | 11   (2.4GHz) | -49  | WPA/WPA2/WPA3 PSK    | 84:70:D7:29:70:70 | Disable 
+uart:~$ 9    | funrun                           6     | 11   (2.4GHz) | -86  | WPA/WPA2/WPA3 PSK    | 84:70:D7:3A:25:67 | Disable 
+uart:~$ 10   | 819 Paramount                    13    | 11   (2.4GHz) | -86  | WPA/WPA2/WPA3 PSK    | 84:70:D7:3A:25:70 | Disable 
+uart:~$ 11   | funrun                           6     | 11   (2.4GHz) | -62  | WPA/WPA2/WPA3 PSK    | 84:70:D7:4A:4E:E7 | Disable 
+uart:~$ 12   | funrun                           6     | 11   (2.4GHz) | -49  | WPA/WPA2/WPA3 PSK    | 84:70:D7:29:70:67 | Disable 
+uart:~$ 13   | 819 Paramount                    13    | 11   (2.4GHz) | -62  | WPA/WPA2/WPA3 PSK    | 84:70:D7:4A:4E:F0 | Disable 
+uart:~$ 14   | 819 Paramount                    13    | 11   (2.4GHz) | -49  | WPA/WPA2/WPA3 PSK    | 84:70:D7:29:70:70 | Disable 
+uart:~$ 17   | funrun                           6     | 11   (2.4GHz) | -62  | WPA/WPA2/WPA3 PSK    | 84:70:D7:4A:4E:E7 | Disable 
+uart:~$ 18   | 819 Paramount                    13    | 11   (2.4GHz) | -63  | WPA/WPA2/WPA3 PSK    | 84:70:D7:4A:4E:F0 | Disable 
+uart:~$ Scan request done

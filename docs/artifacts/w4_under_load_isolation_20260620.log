@@ -1,0 +1,43 @@
+=== W4 under-load BLE gap — isolation + hardware-state block (2026-06-20) ===
+
+## Run #2 (BT_POLL_PRIO=8, relaxed supervision timeout): genuine under-load gap
+   image: build_whd_soak; load: pico_ping=1000ms host_ping=2s; BOOT_S=25
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+EARLY DISCONNECT (unexpected)
+EARLY DISCONNECT (unexpected)
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+EARLY DISCONNECT (unexpected)
+EARLY DISCONNECT (unexpected)
+>> cycle 1: notif=0 conn=0s end=ALIVE disc=0
+FAIL: peripheral not found in scan
+FAIL: peripheral not found in scan
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+connected; subscribing ...
+>> cycle 2: notif=0 conn=0s end=ALIVE disc=0
+
+## Run #3 (BT_POLL_PRIO=2): central mostly cannot FIND the peripheral
+FAIL: peripheral not found in scan
+FAIL: peripheral not found in scan
+FAIL: peripheral not found in scan
+FAIL: peripheral not found in scan
+>> cycle 1: notif=0 conn=0s end=ALIVE disc=0
+FAIL: peripheral not found in scan
+FAIL: peripheral not found in scan
+found 88:A2:9E:D1:6D:A0 (test-picow-bluetooth); connecting ...
+
+## Device IS advertising (fresh-boot UART, prio-2 build):
+[1;32muart:~$ [m[8D[J[00:00:03.373,000] [0m<inf> whd_bt_glue: BT up over WHD bus (patchram loaded), MAC 88:a2:9e:d1:6d:9f[0m
+[1;32muart:~$ [m[8D[J[00:00:07.293,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:07.388,000] [0m<inf> ble_peripheral: Bluetooth initialized; starting advertising as "test-picow-bluetooth"[0m
+
+## Host adapter HEALTHY but Pico not seen (independent bleak discover):
+   scanned 5 devices; target 88:A2:9E:D1:6D:A0 seen: False  (RSSI scans: not found)
+
+## A/B: priority is NOT the cause — both undiscoverable on fresh boot + host reset:
+   PREEMPT(8) fresh boot: target found = False
+   PREEMPT(2) fresh boot: target found = False
+
+## CONCLUSION: BT advertising RF degraded after many SWD-reset-only cycles.
+   SWD 'reset run' does NOT power-cycle the CYW43 (WL_REG_ON stays high).
+   => BLOCKED on an operator USB power-cycle to recover the chip + measure the
+      under-load fixes (relaxed supervision timeout; BT-first poll priority) cleanly.

@@ -1,0 +1,19 @@
+=== WHD BT-TX deficit: georgerobotics-reference discriminator (2026-06-20) ===
+Question: is the undiscoverable Pico BT due to accumulated chip state (needs
+power-cycle) or a WHD-mode BT bring-up config gap? Test on the SAME chip/bench.
+
+## WHD build (build_whd_soak), WiFi ASSOCIATED:    target found = FALSE (104 other adv pkts seen)
+## WHD build, after 'wifi disconnect' (WiFi idle):  target found = FALSE (116 other adv pkts seen)
+   -> not WiFi-coex; host scanner healthy; WiFi got DHCP earlier so chip is alive.
+
+## GEORGEROBOTICS build (build_soak) flashed to the SAME chip, same moment:
+   target found = TRUE  RSSI = -70 dBm   (274 adv pkts)
+
+CONCLUSION: BT hardware is fine; WHD-mode BT TX is ~30 dB weak PERSISTENTLY.
+Not accumulated state, not a power-cycle issue. It is a WHD BT bring-up config
+gap (chip-side NVRAM/coex/PA or a missing BT-power VSC). Same cybt patchram +
+same Zephyr HCI host in both builds. Corroborates w4_ble_txpower_ab_20260620.log.
+
+NVRAM note: WHD Murata-1YN nvram (cyfmac43439-1YN.txt) has btc_mode=0,
+muxenab=0x11, boardflags=0x00404001, boardflags3=0x08000000 — compare vs
+georgerobotics wifi_nvram_43439.h for the BT coex/PA delta.

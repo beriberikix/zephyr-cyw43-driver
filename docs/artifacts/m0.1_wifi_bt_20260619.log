@@ -1,0 +1,33 @@
+=== M0.1 functional verification 2026-06-19T13:39:25Z ===
+[wifi status]
+wifi status
+Status: successful
+==================
+State: COMPLETED
+Interface Mode: STATION
+Link Mode: WIFI 4 (802.11n/HT)
+SSID: 819 Paramount
+BSSID: 84:70:D7:29:70:70
+Band: 2.4GHz
+Channel: 11
+Security:  WPA2-PSK
+MFP: Disable
+RSSI: -63
+Beacon Interval: 0
+DTIM: 0
+TWT: Not supported
+Current PHY TX rate (Mbps) : 0.0
+[1;32muart:~$ [m
+[bt init]
+bt init
+[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:01:09.864,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[00:01:09.912,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:01:09.912,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:01:09.912,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:01:09.912,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m
+[bt advertise on]
+bt advertise on
+Advertising started
+[1;32muart:~$ [m

@@ -14,8 +14,39 @@ menuconfig WIFI_ZEPHYR_CYW43
         select PICOSDK_USE_UART
 	select SPI
 	select SPI_RPI_PICO_PIO
-	
+	# The CYW43 BT HCI driver implements the vendor setup() hook, which
+	# verifies the controller's public BD_ADDR == WiFi MAC + 1.
+	select BT_HCI_SETUP if BT
+
 #if WIFI_ZEPHYR_CYW43
+
+# Which low-level transport backs the CYW43 driver. The georgerobotics
+# cyw43_ll stack is the proven default; the WHD backend is the in-progress
+# Infineon AIROC/WHD port (see docs/whd-contract.md and the whd-port branch).
+choice CYW43_TRANSPORT
+	prompt "CYW43 transport backend"
+	default CYW43_TRANSPORT_GEORGEROBOTICS
+	depends on WIFI_ZEPHYR_CYW43
+	help
+	  Selects the low-level WiFi+BT transport beneath the Zephyr glue
+	  (poll thread, recursive bus lock, bt_hci device). The upward driver
+	  surface is identical for both backends.
+
+config CYW43_TRANSPORT_GEORGEROBOTICS
+	bool "georgerobotics cyw43_ll (vendored submodule, proven)"
+	help
+	  Use the vendored georgerobotics cyw43-driver (cyw43_ll) plus the
+	  pico-sdk cybt_shared_bus BT transport. This is the verified stack.
+
+config CYW43_TRANSPORT_WHD
+	bool "Infineon AIROC/WHD (port in progress)"
+	help
+	  Use the Infineon WHD WiFi host driver (from hal_infineon) with the
+	  BT transport re-arbitrated onto the WHD bus lock. Requires the
+	  Infineon EULA firmware blobs (west blobs fetch hal_infineon). See
+	  docs/whd-contract.md.
+
+endchoice
 config WIFI_ZEPHYR_CYW43_SHELL
 	bool "CYW43 shell"
 	depends on SHELL

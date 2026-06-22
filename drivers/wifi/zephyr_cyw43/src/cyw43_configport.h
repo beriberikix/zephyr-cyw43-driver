@@ -42,6 +42,15 @@ extern bool enable_spi_packet_dumping;
 #include <time.h>
 #include <assert.h>
 
+/*
+ * The pico-sdk cybt_shared_bus glue (pulled in from hal_rpi_pico for the BT
+ * transport) calls the pico-sdk printf-style panic(). The WiFi bus path already
+ * pulls this declaration in transitively via hardware/gpio.h, but the BT glue
+ * does not, so declare it here (the cyw43-driver config chain includes this
+ * header) to keep the prototype consistent across both translation units.
+ */
+#include "pico/platform/panic.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -1,0 +1,68 @@
+diff --git a/drivers/wifi/infineon/airoc_wifi.c b/drivers/wifi/infineon/airoc_wifi.c
+index 69375924e63..a269fba2a96 100644
+--- a/drivers/wifi/infineon/airoc_wifi.c
++++ b/drivers/wifi/infineon/airoc_wifi.c
+@@ -53,6 +53,19 @@ int airoc_wifi_init_primary(const struct device *dev, whd_interface_t *interface
+ NET_BUF_POOL_FIXED_DEFINE(airoc_pool, AIROC_WIFI_PACKET_POOL_COUNT,
+ 				AIROC_WIFI_PACKET_POOL_SIZE, 0, NULL);
+ 
++/* Coex buffer arbitration (whd-port W6): airoc_pool is shared by WiFi RX/TX AND
++ * every BT backplane transfer (the BT side runs over the same WHD bus). Under
++ * WiFi+BT bus contention the WHD SDPCM TX queue stalls and WiFi TX would
++ * consume the whole pool, starving the BT backplane
++ * (whd_bus_transfer_backplane_bytes) -> the BLE link drops (~101 s under
++ * moderate load). Track in-flight buffers and make WiFi DATA TX yield once the
++ * pool falls to a small reserve, so the BT backplane (and WiFi RX/control)
++ * always have buffers. The dropped TX is retransmitted by the net stack; WiFi
++ * throughput dips, BT survives.
++ */
++static atomic_t airoc_pool_inflight;
++#define AIROC_POOL_BT_RESERVE 6
++
+ /* AIROC globals */
+ static uint16_t ap_event_handler_index = 0xFF;
+ 
+@@ -300,9 +313,14 @@ static whd_result_t airoc_wifi_host_buffer_get(whd_buffer_t *buffer, whd_buffer_
+ 	struct net_buf *buf;
+ 
+ 	buf = net_buf_alloc_len(&airoc_pool, size, K_NO_WAIT);
+-	if ((buf == NULL) || (buf->size < size)) {
++	if (buf == NULL) {
+ 		return WHD_BUFFER_ALLOC_FAIL;
+ 	}
++	if (buf->size < size) {
++		net_buf_unref(buf);
++		return WHD_BUFFER_ALLOC_FAIL;
++	}
++	atomic_inc(&airoc_pool_inflight);
+ 	*buffer = buf;
+ 
+ 	/* Set buffer size */
+@@ -314,6 +332,7 @@ static whd_result_t airoc_wifi_host_buffer_get(whd_buffer_t *buffer, whd_buffer_
+ static void airoc_wifi_buffer_release(whd_buffer_t buffer, whd_buffer_dir_t direction)
+ {
+ 	CY_UNUSED_PARAMETER(direction);
++	atomic_dec(&airoc_pool_inflight);
+ 	(void)net_buf_destroy((struct net_buf *)buffer);
+ }
+ 
+@@ -365,6 +384,19 @@ static int airoc_mgmt_send(const struct device *dev, struct net_pkt *pkt)
+ 	size_t pkt_len = net_pkt_get_len(pkt);
+ 	struct net_buf *buf = NULL;
+ 
++	/* Coex backpressure: reserve a few pool buffers for the BT backplane so
++	 * a stalled WHD TX queue can't drain the shared pool and starve BT under
++	 * WiFi+BT contention (W6 ~101s drop). Drop this TX when the pool is low;
++	 * the net stack retransmits.
++	 */
++	if (atomic_get(&airoc_pool_inflight) >=
++	    (AIROC_WIFI_PACKET_POOL_COUNT - AIROC_POOL_BT_RESERVE)) {
++#if defined(CONFIG_NET_STATISTICS_WIFI)
++		data->stats.errors.tx++;
++#endif
++		return -ENOMEM;
++	}
++
+ 	/* Read the packet payload */
+ 	if (net_pkt_read(pkt, data->frame_buf, pkt_len) < 0) {
+ 		LOG_ERR("net_pkt_read failed");

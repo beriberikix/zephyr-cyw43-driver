@@ -1,0 +1,26 @@
+=== item 2 BLE-with-ISO (unicast) smoke test 2026-06-19T14:00:48Z ===
+[image: build_iso, CONFIG_BT_ISO_UNICAST + BT_ISO_TX/RX=y, ext-adv off; SCO gated, ISO RX guarded]
+--- bt init ---
+bt init
+[1;32muart:~$ [m[8D[JBluetooth initialized
+[1;32muart:~$ [m[8D[J[00:00:12.882,000] [0m<inf> bt_driver: controller public BD_ADDR 88:A2:9E:D1:6D:A0 verified (= WiFi MAC + 1)[0m
+[1;32muart:~$ [m[8D[J[00:00:12.967,000] [1;33m<wrn> bt_hci_core: Num of Controller's ACL packets != ACL bt_conn_tx contexts (8 != 3)[0m
+[1;32muart:~$ [m[8D[J[00:00:13.017,000] [0m<inf> bt_hci_core: HCI transport: HCI[0m
+[1;32muart:~$ [m[8D[J[00:00:13.017,000] [0m<inf> bt_hci_core: Identity: 88:A2:9E:D1:6D:A0 (public)[0m
+[1;32muart:~$ [m[8D[J[00:00:13.017,000] [0m<inf> bt_hci_core: HCI: version 5.2 (0x0b) revision 0x0000, manufacturer 0x0131[0m
+[1;32muart:~$ [m[8D[J[00:00:13.017,000] [0m<inf> bt_hci_core: LMP: version 5.2 (0x0b) subver 0x2310[0m
+[1;32muart:~$ [m[8D[J[1;32muart:~$ [m--- bt advertise on (legacy; should succeed) ---
+bt advertise on
+Advertising started
+[1;32muart:~$ [m--- iso listen txrx (exercise ISO unicast accept path) ---
+iso listen txrx
+[1;31mUnable to register ISO cap (err -134)
+[m[1;32muart:~$ [m--- wifi status (coex: WiFi still up with BT+ISO) ---
+State: COMPLETED
+SSID: 819 Paramount
+BSSID: 84:70:D7:29:70:70
+RSSI: -61
+--- kernel uptime ---
+kernel uptime
+Uptime: 29767 ms
+[1;32muart:~$ [m
