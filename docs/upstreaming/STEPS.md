@@ -14,7 +14,7 @@ Cross-references: `RFC.md`, `track-A-zephyr-airoc-leakfix.md`,
 ## 0. One-time prep
 - [x] Confirm your Git identity is your **legal name** + the email you sign with:
       `git config user.name`, `git config user.email`.
-- [ ] Confirm/locate forks: `zephyrproject-rtos/zephyr`, `raspberrypi/pico-sdk`
+- [x] Confirm/locate forks: `zephyrproject-rtos/zephyr`, `raspberrypi/pico-sdk`
       (and optionally `zephyrproject-rtos/hal_rpi_pico`, `zephyrproject-rtos/hal_infineon`).
 - [ ] (If contributing on behalf of Beechwoods Software) confirm any
       company authorship/CLA expectations for work derived from the
@@ -23,7 +23,7 @@ Cross-references: `RFC.md`, `track-A-zephyr-airoc-leakfix.md`,
 ## 1. Track 0 — RFC issue FIRST (do before any feature code)
 - [ ] New issue → choose the **"RFC / Proposal"** template (it sets Type=RFC).
       Title — **no "RFC:" prefix** (the type chip covers it):
-      `WiFi+BT coexistence over the WHD gSPI bus for CYW43439 (Pico 2 W)`.
+      `Bluetooth (HCI over the shared gSPI bus) for the CYW43439 — Raspberry Pi Pico 2 W`.
 - [ ] Fill each template field from the matching `## FIELD:` section in
       `docs/upstreaming/RFC.md` — Problem Description, Proposed Change (Summary),
       Proposed Change (Detailed), Dependencies, Concerns and Unresolved Questions,
