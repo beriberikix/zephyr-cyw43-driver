@@ -1,140 +1,165 @@
 <!--
-This file is the body for a GitHub RFC issue to open at
-https://github.com/zephyrproject-rtos/zephyr/issues/new (label: "RFC").
-Paste everything BELOW the title line. Title to use:
+HOW TO USE THIS FILE
+The Zephyr "RFC / Proposal" issue template (github.com/zephyrproject-rtos/zephyr,
+New issue -> RFC / Proposal) has discrete fields. Paste each section below into the
+matching field. `Type` is already set to "RFC" by the template, so the TITLE has no
+"RFC:" prefix. Set sidebar "Priority" to your judgement (Low/Medium is fine for an
+RFC). `*` = required field.
 
-  RFC: WiFi+BT coexistence over the WHD gSPI bus for CYW43439 (Pico 2 W)
+  Title                         -> "FIELD: Title"
+  Problem Description *         -> "FIELD: Problem Description"
+  Proposed Change (Summary) *   -> "FIELD: Proposed Change (Summary)"
+  Proposed Change (Detailed) *  -> "FIELD: Proposed Change (Detailed)"
+  Dependencies                  -> "FIELD: Dependencies"
+  Concerns and Unresolved Q.    -> "FIELD: Concerns and Unresolved Questions"
+  Alternatives Considered       -> "FIELD: Alternatives Considered"
 
-Do NOT paste this comment block. Replace <RFC#> cross-references after the issue
-is created. See ../upstreaming/STEPS.md for the exact submission procedure.
+Replace any <RFC#> / repo-path placeholders. Do not paste this comment block.
 -->
 
-# RFC: WiFi+BT coexistence over the WHD gSPI bus for CYW43439 (Pico 2 W)
+## FIELD: Title
 
-## Summary
+WiFi+BT coexistence over the WHD gSPI bus for CYW43439 (Pico 2 W)
 
-The Infineon CYW43439 (e.g. Raspberry Pi Pico 2 W, Murata 1YN) carries **both WiFi
-and Bluetooth over a single shared 3-pin gSPI bus**. Zephyr ships the AIROC/WHD WiFi
-driver (`drivers/wifi/infineon/`) but **no BT-HCI transport for this part**, and no
-WiFi+BT *coexistence* support on the shared bus.
+## FIELD: Problem Description
 
-This RFC proposes adding WiFi+BT coexistence on the WHD gSPI transport, and asks
-maintainers for direction on the right upstream shape before we submit a driver. We
-have a **hardware-verified** implementation and want to contribute it correctly.
+The Infineon CYW43439 — used on the Raspberry Pi **Pico 2 W** (Murata 1YN), a very
+common low-cost board — carries **WiFi and Bluetooth over a single shared 3-pin gSPI
+bus**. Today on mainline Zephyr you cannot run reliable simultaneous WiFi+BLE on this
+part:
 
-Headline result: the WHD transport sustains a **2-hour continuous WiFi+BLE
-coexistence soak with zero faults** (71,021 notifications / 7200.1 s @ 9.9/s) — a
-gate the alternative georgerobotics transport provably cannot meet (it faults at
-~19 min on a below-the-host-lock gSPI corruption, documented below).
+- Zephyr ships the AIROC/WHD **WiFi** driver (`drivers/wifi/infineon/`) but **no
+  BT-HCI transport** for the CYW43439, and **no WiFi+BT coexistence** on the shared
+  bus.
+- Under concurrent WiFi+BT load, BT backplane access on the shared gSPI bus corrupts
+  **below the host bus lock**. The community/pico-sdk BT path (`cybt_shared_bus` on
+  the georgerobotics `cyw43_ll` stack) `assert()`s on the corrupt controller
+  ring-index read → kernel panic. We proved with gdb that at the fault the host bus
+  mutex is *held* by the BT TX thread (`lock_count = 1`) yet the ring index still
+  reads back out of range (≥ `0x1000`) — i.e. the corruption is at/under the
+  transport, not a host-locking bug, and that transport's BT read path has no
+  F1-overflow recovery (its WiFi read path does).
 
-## Motivation / problem
+The practical effect: a "zero faults over 2 h continuous coexistence" bar is
+**unreachable** on the existing path, so Pico 2 W users can't depend on concurrent
+WiFi+BLE in mainline Zephyr.
 
-Under concurrent WiFi+BT load the BT backplane access on the shared gSPI bus is
-fragile. We exhaustively characterized this on two independent transports:
+## FIELD: Proposed Change (Summary)
 
-- The **georgerobotics** `cyw43_ll` + pico-sdk `cybt_shared_bus` stack: the BT
-  ring-index read corrupts **below** the host bus lock and `cybt_get_bt_buf_index()`
-  `assert()`s → kernel panic. We proved (gdb) the cyw43 bus mutex is *held* by the
-  BT TX thread at the fault, yet the controller's shared-memory ring index reads back
-  out of range — i.e. the corruption is at/under the transport, not a host locking
-  bug. This transport's WiFi read path has F1-overflow recovery; the BT read path has
-  none. The "zero faults over 2 h" gate is **unreachable** on it.
+Add WiFi+BT **coexistence** on the **in-tree AIROC/WHD transport**:
 
-- The **WHD/AIROC** transport (already in-tree for WiFi) + a re-arbitrated `cybt` BT
-  path: with four targeted fixes (below) it **meets** the gate.
+- Reuse the existing WHD WiFi driver as-is (no new WiFi driver).
+- Add a BT-HCI path that **retains pico-sdk `cybt_shared_bus`** but re-homes it onto a
+  shared recursive gSPI **bus lock** + WHD's **backplane accessors** (there is no
+  WHD-native gSPI BT-HCI transport).
+- Four targeted fixes (below) close the coexistence gaps.
 
-## Two transports, both exhaustively tested
+Result on `rpi_pico2/rp2350a/m33/w`: a **2-hour continuous WiFi+BLE coexistence soak
+with 0 faults** (71,021 BLE notifications @ 9.9/s) — the gate the alternative
+transport provably cannot meet.
 
-All testing on `rpi_pico2/rp2350a/m33/w` (RP2350, Cortex-M33) over a Raspberry Pi
-Debug Probe, with a self-contained coexistence harness (a connectable BLE notify
-peripheral + a host `bleak` central + concurrent WiFi ping load + gdb liveness
-classification). **Dozens of soak runs across two days**; full raw logs archived
-(artifact inventory at the end).
+Two of the four fixes are **transport-agnostic and upstreamable immediately** (an
+`airoc_wifi.c` `net_buf` leak fix; a `cybt` re-read hardening); the coexistence
+arbitration pieces are what this RFC seeks direction on.
 
-### georgerobotics transport — hardened to its limit, accepted-with-residual
-- Functional bring-up + hardening all verified on hardware: single WiFi+BT image
-  (STA associate + DHCP; `bt init`/advertise), **BD_ADDR stable 10/10 cold boots**,
-  HCI RX robustness (a 120 s BT flood, 542 reports @ ~4.5/s, uptime 17→150 s, 0
-  faults), thread/bus-arbitration audit (root-caused and fixed a poll-thread
-  priority inversion), shared-power init-order matrix (BT-only / WiFi→BT / BT→WiFi
-  all clean; BT survives WiFi disconnect), firmware-blob provenance pinned.
-- **§2.7 corruption, gdb-proven below the host lock:** at the panic the cyw43 bus
-  mutex owner is `bt_tx_processor` with `lock_count = 1`, and the ring index reads
-  back ≥ `0x1000` (`BTSDIO_FWBUF_SIZE`). Reproduces from both the TX path (soak) and
-  the RX path (denser BT flood faults at ~70 s; load-proportional).
-- **Soak envelope:** bounded 8-boot cold-boot soak = **0 faults, 0 disconnects,
-  6,070 notifications over 630 s**; a single sustained link streamed **11,180
-  notifications over ~19 min (1161.7 s) then FAULTED**; moderate load ≈ **2 faults
-  per 4 connections**, and **3 faults / 12 cycles (MTBF ≈ 101 s)**.
-- Disposition: coexistence accepted **with a documented residual** — the 2 h
-  zero-fault gate is not achievable on this transport.
+## FIELD: Proposed Change (Detailed)
 
-### WHD transport — meets the gate
-Milestones W0–W6, each ending in a committed Pico 2 W log:
-- W0 transport bring-up; W1 WiFi scan over PIO-SPI; W2 associate + DHCP + ping
-  (RSSI −48, 3/3 ping); W3 BT bring-up over the WHD-arbitrated bus (BD_ADDR = MAC+1,
-  stable 10/10 boots); W4 coexistence under load; W5 init/power-order matrix (also
-  caught + fixed a stack overflow); **W6 the 2 h gate**.
-- **W6 — 2-hour continuous coexistence soak: 71,021 notifications / 7200.1 s @
-  9.9/s, max inter-notify gap 0.315 s, 0 stalls, 0 unexpected disconnects, 0
-  faults.** Single BLE connection under moderate WiFi load.
-- Every fix below was **independently root-caused with hardware evidence**, e.g.:
-  - BT TX-power: a same-bench A/B showed WHD BT at **−92 dBm** vs georgerobotics
-    **−61/−70 dBm**; traced to the Murata-1YN NVRAM shipping BT coex disabled
-    (`btc_mode=0`); enabling it restored **−67 dBm**.
-  - The sustained-load BLE drop: gdb in-flight buffer counters at pool exhaustion
-    read `alloc{TX 1217, RX 27471}` vs `release{TX 1197, RX 27471}` — RX perfectly
-    balanced, **20 TX buffers stuck** in the WHD SDPCM TX queue (chip TX
-    flow-control starvation), draining the shared `airoc_pool` and starving the BT
-    backplane. Load-scaling confirmed it: no/half WiFi load held 300 s clean,
-    moderate load dropped at ~101 s; pool 20 → ~101 s, pool 48 → ~185 s.
+**Architecture (reuses existing components):**
+- WiFi: the in-tree `drivers/wifi/infineon/` AIROC/WHD driver, unchanged, over the
+  board's PIO-SPI.
+- BT: the pico-sdk `cybt_shared_bus` HCI transport (already vendored via
+  `hal_rpi_pico`), **re-arbitrated** onto a shared recursive gSPI bus lock and WHD's
+  `whd_bus_*_backplane*` accessors so WiFi and BT serialize on the bus. BD_ADDR =
+  WiFi MAC + 1.
 
-## The four fixes (and where each belongs upstream)
+**The four fixes:**
 
-| Fix | Target | Upstream home | Coex-only? |
+| Fix | Target file | Upstream home | Coex-only? |
 |---|---|---|---|
-| Shared gSPI bus lock around `whd_bus_spi_transfer()` | `drivers/wifi/infineon/airoc_whd_hal_spi.c` | Zephyr main | yes (needs this RFC) |
-| BT-first buffer reserve in `airoc_pool` (+ a latent `net_buf` leak fix) | `drivers/wifi/infineon/airoc_wifi.c` | Zephyr main | reserve = coex; **leak fix = standalone** |
-| `cybt_get_bt_buf_index()` re-read instead of `assert()` on a transient corrupt index | `cybt_shared_bus_driver.c` | pico-sdk / `hal_rpi_pico` | no (benefits all cybt users) |
+| Shared gSPI bus lock around `whd_bus_spi_transfer()` | `drivers/wifi/infineon/airoc_whd_hal_spi.c` | Zephyr main | yes (this RFC) |
+| BT-first buffer reserve in the shared `airoc_pool` (+ a latent `net_buf` leak fix) | `drivers/wifi/infineon/airoc_wifi.c` | Zephyr main | reserve = coex; **leak fix is standalone** |
+| `cybt_get_bt_buf_index()` re-reads a transient corrupt index instead of `assert()` | `cybt_shared_bus_driver.c` | pico-sdk / `hal_rpi_pico` | no (benefits all cybt users) |
 | Enable BT coex in the Murata-1YN NVRAM (`btc_mode=1`, `muxenab=0x100`) | `cyfmac43439-1YN.txt` | Infineon / `hal_infineon` | no (board RF config) |
 
-The BT-over-WHD glue itself retains pico-sdk `cybt_shared_bus` (there is no
-WHD-native gSPI BT-HCI transport), re-homed onto the WHD bus lock + backplane.
+**Validation of the WHD path (hardware, `rpi_pico2/rp2350a/m33/w`):** milestones
+W0–W6 each ended in a committed Pico 2 W log — WiFi scan, associate + DHCP + ping,
+BT bring-up (BD_ADDR stable 10/10 cold boots), coexistence under load, init/power
+order, and the gate:
+- **W6 — 2 h continuous coexistence soak: 71,021 notifications / 7200.1 s @ 9.9/s,
+  max gap 0.315 s, 0 stalls, 0 unexpected disconnects, 0 faults.**
+- Each fix was independently root-caused with hardware evidence, e.g.: a same-bench
+  TX-power A/B traced weak BLE to the NVRAM shipping BT coex disabled (`btc_mode=0`)
+  → −92 dBm; enabling it → **−67 dBm** (= the georgerobotics config −70). The
+  sustained-load BLE drop was pinned by gdb in-flight buffer counters at pool
+  exhaustion — `alloc{TX 1217, RX 27471}` vs `release{TX 1197, RX 27471}` → RX
+  balanced, **20 TX buffers stuck** in the WHD SDPCM TX queue draining the shared
+  `airoc_pool` and starving the BT backplane; load-scaling confirmed it (no/half WiFi
+  load held 300 s clean, moderate load dropped ~101 s). The buffer-reserve fix closes
+  it.
 
-## Honest caveats (so reviewers have the full picture)
-- **BT bring-up after an SWD warm reset is intermittent** (discoverable on every
-  other reset). We proved via an operator USB power-cycle that a true **cold boot is
-  clean** — it is a debug/warm-reset artifact, not a product cold-boot defect; the
-  test harness uses reset-until-discoverable.
-- **The WHD coex margin under sustained load is thinner than georgerobotics'** until
-  the buffer-reserve fix; that fix is what closes the gap to the 2 h gate.
-- **External dependencies / licensing:** the BT path uses pico-sdk `cybt`
-  (BSD-3-Clause) and a vendored combined BT firmware blob. The firmware blob is the
-  item that needs the Zephyr blob/licensing process.
+**Reproduction:** a self-contained coexistence harness lives in `test/coex/`
+(`soak.sh`, `ble_central.py`, reset-until-discoverable); raw logs for both transports
+are archived (28 files under `docs/artifacts/`, 47 under `test/coex/results/`).
 
-## Questions for maintainers
-1. Where should a **gSPI BT-HCI transport** for the CYW43439 live in Zephyr? Is
-   reusing pico-sdk `cybt_shared_bus` (via `hal_rpi_pico`) acceptable, or do you want
-   a WHD-native BT transport written?
-2. Is a **WiFi-driver-resident coexistence arbitration** (the bus lock + the
-   buffer reserve in `drivers/wifi/infineon/`) the right home, or should it sit in a
-   coex layer / the BT HCI driver?
-3. What is the expected path for the **BT firmware blob** (west blob + EULA/governing
-   board)?
-4. Would you prefer this as an **out-of-tree module** first (we have one staged) with
-   only the transport-agnostic fixes upstreamed?
+## FIELD: Dependencies
 
-## What we can upstream immediately regardless of direction
-- The **`airoc_wifi.c` latent `net_buf` leak fix** (a too-small buffer returned
-  without `net_buf_unref`) — Apache, zero BT dependency. PR ready (see Track A).
-- The **`cybt` re-read** fix — a real assert-on-transient-corruption hardening that
-  benefits all cybt users — to pico-sdk / `hal_rpi_pico`.
+- `drivers/wifi/infineon/` (AIROC/WHD WiFi) — gains coexistence arbitration (the bus
+  lock + the `airoc_pool` buffer reserve).
+- **Bluetooth HCI subsystem** — needs a home for a gSPI BT-HCI transport for this part.
+- `hal_rpi_pico` (pico-sdk `cybt_shared_bus`) — the BT transport + the re-read fix.
+- `hal_infineon` — the Murata-1YN NVRAM (`btc_mode`) and WHD WiFi firmware.
+- **BT firmware blob** — a combined CYW43439 BT firmware image; needs the Zephyr west
+  blob + EULA/governing-board path.
+- Reviewers/areas (MAINTAINERS): Infineon AIROC WiFi, Bluetooth HCI, the two HAL
+  modules.
 
-## Reproduction & evidence
-Harness: `test/coex/soak.sh`, `test/coex/ble_central.py`, reset-until-discoverable.
-Raw logs (georgerobotics + WHD): `docs/artifacts/` (28 files) and
-`test/coex/results/` (47 files). Key artifacts: `w6_soak_2h_clean_20260620.log`
-(the 2 h gate), `w6_txqueue_stall_localized_20260620.log` (the gdb buffer counters),
-`w4_btx_geo_vs_whd_discriminator_20260620.log` (the TX-power A/B),
-`soak_bounded_long_20260619.log` (the georgerobotics ~19 min → fault), and the
-§2.7 gdb proof (`txlock_mutex_held_at_fault_20260619.txt`).
+## FIELD: Concerns and Unresolved Questions
+
+Questions for maintainers (the reason this is an RFC before a driver PR):
+1. **Where should a gSPI BT-HCI transport for the CYW43439 live**, and is reusing
+   pico-sdk `cybt_shared_bus` (via `hal_rpi_pico`) acceptable, or do you want a
+   WHD-native BT transport written?
+2. Is **WiFi-driver-resident coexistence arbitration** (the bus lock + buffer reserve
+   in `drivers/wifi/infineon/`) the right home, or should it sit in a coex layer / the
+   BT HCI driver?
+3. What is the expected path for the **BT firmware blob** (west blob + EULA /
+   governing board)?
+4. Would you prefer this start as an **out-of-tree module** (we have one staged), with
+   only the transport-agnostic fixes upstreamed for now?
+
+Honest caveats:
+- **BT bring-up after an SWD *warm* reset is intermittent** (discoverable on every
+  other reset). An operator USB power-cycle proved a true **cold boot is clean** — it
+  is a debug/warm-reset artifact, not a product cold-boot defect (the harness uses
+  reset-until-discoverable).
+- The WHD coexistence margin under sustained load was thinner than the alternative
+  until the buffer-reserve fix; that fix is what reaches the 2 h gate.
+- External dependencies: pico-sdk `cybt` is BSD-3-Clause (documentable); the BT
+  firmware blob is the licensing/governing-board item.
+
+## FIELD: Alternatives Considered
+
+**1. The georgerobotics `cyw43_ll` + `cybt` transport (the pico-sdk/community path).**
+We started here and hardened it exhaustively on hardware before concluding it cannot
+meet the bar:
+- Bring-up + hardening all verified: single WiFi+BT image (associate + DHCP; `bt
+  init`/advertise), **BD_ADDR stable 10/10 cold boots**, HCI RX robustness (120 s BT
+  flood, 542 reports, 0 faults), a root-caused-and-fixed poll-thread priority
+  inversion, a clean shared-power init-order matrix, firmware-blob provenance pinned.
+- **But the §2.7 corruption is fundamental to it:** gdb-proven below the host lock
+  (mutex held by `bt_tx_processor`, index reads ≥ `0x1000`). Soak envelope: bounded
+  8-boot cold-boot soak = **0 faults / 6,070 notif / 630 s**, but a single sustained
+  link streamed **11,180 notif over ~19 min then FAULTED**, and moderate load gave
+  **≈ 2 faults per 4 connections** (MTBF ≈ 101 s). The 2 h zero-fault gate is
+  **unreachable** on this transport → we moved to WHD. (We propose still upstreaming
+  the transport-agnostic `cybt` re-read hardening, which makes this path degrade
+  gracefully instead of panicking.)
+
+**2. A WHD-native BT transport (no `cybt`).** None exists upstream; a larger effort.
+Open question #1 above — we retained `cybt` to get a working, tested result; a native
+transport could replace it later.
+
+**3. Out-of-tree module only (no mainline).** A valid distribution vehicle (we have
+one staged) but it leaves mainline Pico 2 W users without coexistence. We propose
+upstreaming at least the two transport-agnostic fixes and using this RFC to find the
+right mainline home for the coexistence pieces.

@@ -12,7 +12,7 @@ Cross-references: `RFC.md`, `track-A-zephyr-airoc-leakfix.md`,
 ---
 
 ## 0. One-time prep
-- [ ] Confirm your Git identity is your **legal name** + the email you sign with:
+- [x] Confirm your Git identity is your **legal name** + the email you sign with:
       `git config user.name`, `git config user.email`.
 - [ ] Confirm/locate forks: `zephyrproject-rtos/zephyr`, `raspberrypi/pico-sdk`
       (and optionally `zephyrproject-rtos/hal_rpi_pico`, `zephyrproject-rtos/hal_infineon`).
@@ -21,11 +21,14 @@ Cross-references: `RFC.md`, `track-A-zephyr-airoc-leakfix.md`,
       Beechwoods georgerobotics driver — see `compliance-checklist.md`.
 
 ## 1. Track 0 — RFC issue FIRST (do before any feature code)
-- [ ] Open a new issue at https://github.com/zephyrproject-rtos/zephyr/issues/new,
-      label **RFC**. Title:
-      `RFC: WiFi+BT coexistence over the WHD gSPI bus for CYW43439 (Pico 2 W)`.
-- [ ] Paste the body of `docs/upstreaming/RFC.md` (everything below its title;
-      skip the leading HTML comment).
+- [ ] New issue → choose the **"RFC / Proposal"** template (it sets Type=RFC).
+      Title — **no "RFC:" prefix** (the type chip covers it):
+      `WiFi+BT coexistence over the WHD gSPI bus for CYW43439 (Pico 2 W)`.
+- [ ] Fill each template field from the matching `## FIELD:` section in
+      `docs/upstreaming/RFC.md` — Problem Description, Proposed Change (Summary),
+      Proposed Change (Detailed), Dependencies, Concerns and Unresolved Questions,
+      Alternatives Considered. (Skip the leading HTML comment.) Set sidebar
+      **Priority** to your judgement (Low/Medium is fine).
 - [ ] Note the issue number as `<RFC#>` and use it in later PRs.
 - [ ] Announce it on Discord — **`#raspberrypi`** and **`#infineon`** only (the
       vendor channels) — using the two hooks in
