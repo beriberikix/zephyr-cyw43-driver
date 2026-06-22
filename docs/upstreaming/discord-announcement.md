@@ -12,16 +12,16 @@ CYW43439 BT is on the shared gSPI bus, for which there's no in-tree transport;
 the existing Infineon HCI driver is UART-only). Coexistence is the bonus.
 
 **Sequence:** create the GitHub RFC issue first (so you have the link), then post the
-two messages below with `<RFC link>` filled in.
+two messages below with `https://github.com/zephyrproject-rtos/zephyr/issues/111811` filled in.
 
 ---
 
 ## `#raspberrypi`
-> 👋 RFC: **Bluetooth for the Pico 2 W** (and Pico W) on Zephyr — <RFC link>
+> 👋 RFC: **Bluetooth for the Pico 2 W** (and Pico W) on Zephyr — https://github.com/zephyrproject-rtos/zephyr/issues/111811
 > Today these boards have WiFi (the in-tree AIROC driver) but **no usable BLE**: the CYW43439's BT is HCI-over-the-shared-gSPI-bus, and Zephyr only has the *UART* Infineon HCI driver — no shared-bus transport. I have one working (presents pico-sdk `cybt` as a `bt_hci` device), plus **WiFi+BLE coexistence** on that one bus: a **2 h soak, 0 faults** on `rpi_pico2/rp2350a/m33/w`. Includes a pico-sdk `cybt_shared_bus` hardening (re-read a transient corrupt index instead of `assert()`→panic) I'd send to pico-sdk too. Direction/feedback welcome in the issue. 🙏
 
 ## `#infineon`
-> 👋 RFC: **Bluetooth (HCI over the shared gSPI bus) for the CYW43439** — Pico 2 W / Pico W — <RFC link>
+> 👋 RFC: **Bluetooth (HCI over the shared gSPI bus) for the CYW43439** — Pico 2 W / Pico W — https://github.com/zephyrproject-rtos/zephyr/issues/111811
 > Zephyr has CYW43439 BT only over the *UART* HCI path (`BT_HCI_UART_INFINEON`); on these boards BT shares the gSPI bus with WiFi, so there's no in-tree transport. I wired up the shared-bus path + **WiFi+BLE coexistence** (2 h soak, 0 faults). Two findings for Infineon: (1) the Murata-1YN NVRAM ships **`btc_mode=0`** → BT coex disabled → ~30 dB BLE TX deficit on the single shared antenna (`btc_mode=1`+`muxenab=0x100` → −92→−67 dBm); (2) a small `airoc_wifi.c` buffer fix (+ a `net_buf` leak fix). Would value your take on the NVRAM coex default + where a shared-bus BT-HCI transport should live. Full logs in the issue.
 
 ---
